@@ -53,8 +53,7 @@ public static partial class Experiments
         byte[]? tag = null;
         if (separate)
         {
-            tag = GameMadeTag(target, reg)
-                ?? throw new InvalidOperationException("Create one local character in the game first, so the editor can copy its storage tag.");
+            tag = RequireGameMadeTag(target, reg);
             o.WriteLine($"Storage tag for the copies (from the game-made character in the target): {Convert.ToHexString(tag)}");
         }
 
@@ -113,9 +112,14 @@ public static partial class Experiments
 
     sealed record Ctx(string Source, string Target, byte[]? Tag);
 
-    static bool SamePath(string a, string b) =>
+    public static bool SamePath(string a, string b) =>
         string.Equals(System.IO.Path.GetFullPath(a).TrimEnd('\\', '/'), System.IO.Path.GetFullPath(b).TrimEnd('\\', '/'),
             StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The game-made character's storage tag in <paramref name="dir"/>, or a refusal if there is none.</summary>
+    public static byte[] RequireGameMadeTag(string dir, LabCopyRegistry reg) =>
+        GameMadeTag(dir, reg)
+            ?? throw new InvalidOperationException("Create one local character in the game first, so the editor can copy its storage tag.");
 
     /// <summary>Storage tag of the lowest-numbered characterN.ksd in the folder that is not a registered Lab copy.</summary>
     static byte[]? GameMadeTag(string dir, LabCopyRegistry reg)

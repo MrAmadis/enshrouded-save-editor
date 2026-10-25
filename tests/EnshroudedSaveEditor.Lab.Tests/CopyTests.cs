@@ -147,4 +147,58 @@ public class CopyTests : IDisposable
         }
         finally { try { Directory.Delete(local, true); } catch { } }
     }
+
+    [Fact]
+    public void Copy_into_a_separate_target_uses_the_local_tag()
+    {
+        var local = Fixtures.CopyLocalToTemp();
+        try
+        {
+            var srcBefore = Hashes();
+            var localBefore = File.ReadAllBytes(Path.Combine(local, "character0.ksd"));
+            var o = new StringWriter(); var err = new StringWriter();
+
+            var code = Cli.Run(["copy", "--source", tmp, "--target", local, "--from", "character1.ksd", "--name", "Try Me"], o, err, regPath);
+
+            Assert.Equal(0, code);
+            Assert.Equal("", err.ToString());
+            var path = Path.Combine(local, "character1.ksd");
+            var cd = CharacterData.Parse(KsdFile.Parse(File.ReadAllBytes(path))["character_data"].GetData());
+            Assert.Equal("Try Me", cd.Name);
+            Assert.Equal(1, cd.SlotIndex);
+            Assert.Equal(new byte[] { 0xa8, 0x23, 0xb2, 0x28 }, cd.StorageTag);
+            Assert.True(reg.IsWritableCopy(path));
+            Assert.Equal(srcBefore, Hashes());
+            Assert.Equal(localBefore, File.ReadAllBytes(Path.Combine(local, "character0.ksd")));
+        }
+        finally { try { Directory.Delete(local, true); } catch { } }
+    }
+
+    [Fact]
+    public void Copy_into_a_target_without_a_game_made_character_is_refused()
+    {
+        var empty = Path.Combine(Path.GetTempPath(), "lab-empty-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(empty);
+        try
+        {
+            var o = new StringWriter(); var err = new StringWriter();
+            var code = Cli.Run(["copy", "--source", tmp, "--target", empty, "--from", "character1.ksd", "--name", "X"], o, err, regPath);
+            Assert.Equal(1, code);
+            Assert.Contains("Create one local character in the game first", err.ToString());
+            Assert.Empty(Directory.GetFiles(empty));
+            Assert.Empty(reg.List());
+        }
+        finally { try { Directory.Delete(empty, true); } catch { } }
+    }
+
+    [Fact]
+    public void Copy_with_the_old_remote_form_still_works()
+    {
+        var before = Hashes();
+        var code = Cli.Run(["copy", "--remote", tmp, "--from", "character1.ksd", "--name", "Old Form"], new StringWriter(), new StringWriter(), regPath);
+        Assert.Equal(0, code);
+        Assert.Equal("Old Form", CharacterData.Parse(KsdFile.Parse(File.ReadAllBytes(Path.Combine(tmp, "character3.ksd")))["character_data"].GetData()).Name);
+        foreach (var (name, hash) in before) Assert.Equal(hash, Hashes()[name]);
+        Assert.Single(reg.List());
+    }
 }

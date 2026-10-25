@@ -8,7 +8,7 @@ public static class Cli
 {
     const string Usage = """
         Usage:
-          copy --remote <dir> --from <characterN.ksd> --name <name>
+          copy (--remote <dir> | --source <dir> --target <dir>) --from <characterN.ksd> --name <name> [--registry <path>]
           dump --file <ksd> [--section <name>]
           diff --a <ksd> --b <ksd>
           watch --remote <dir> --out <dir>
@@ -27,7 +27,14 @@ public static class Cli
             {
                 case "copy":
                     // Copy only ever creates a new file (CreateNew); it never writes an existing one.
-                    var path = CharacterCopier.Copy(Req(opts, "remote"), Req(opts, "from"), Req(opts, "name"), reg);
+                    var cRemote = opts.GetValueOrDefault("remote");
+                    var cSource = opts.GetValueOrDefault("source") ?? cRemote ?? throw new ArgumentException("Missing --source (or --remote).");
+                    var cTarget = opts.GetValueOrDefault("target") ?? cRemote ?? throw new ArgumentException("Missing --target (or --remote).");
+                    var from = Req(opts, "from");
+                    var fromPath = Path.IsPathRooted(from) ? from : Path.Combine(cSource, from);
+                    // A different target folder gets the storage tag of its game-made character (same rule as make-experiments).
+                    var cTag = Experiments.SamePath(cSource, cTarget) ? null : Experiments.RequireGameMadeTag(cTarget, reg);
+                    var path = CharacterCopier.CopyTo(fromPath, cTarget, Req(opts, "name"), reg, cTag);
                     o.WriteLine($"Created {path}");
                     return 0;
                 case "dump": Dump(Req(opts, "file"), opts.GetValueOrDefault("section"), o); return 0;
