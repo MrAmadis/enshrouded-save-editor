@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/EnshroudedSaveEditor.Core/EnshroudedSaveEditor.Core.csproj" />
     <Project Path="src/EnshroudedSaveEditor.GameData/EnshroudedSaveEditor.GameData.csproj" />
+    <Project Path="src/EnshroudedSaveEditor.UI/EnshroudedSaveEditor.UI.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/EnshroudedSaveEditor.Lab/EnshroudedSaveEditor.Lab.csproj" />
@@ -10,5 +11,6 @@
     <Project Path="tests/EnshroudedSaveEditor.Core.Tests/EnshroudedSaveEditor.Core.Tests.csproj" />
     <Project Path="tests/EnshroudedSaveEditor.GameData.Tests/EnshroudedSaveEditor.GameData.Tests.csproj" />
     <Project Path="tests/EnshroudedSaveEditor.Lab.Tests/EnshroudedSaveEditor.Lab.Tests.csproj" />
+    <Project Path="tests/EnshroudedSaveEditor.UI.Tests/EnshroudedSaveEditor.UI.Tests.csproj" />
   </Folder>
 </Solution>

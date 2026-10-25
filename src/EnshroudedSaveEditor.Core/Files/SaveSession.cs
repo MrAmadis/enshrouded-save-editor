@@ -6,6 +6,9 @@ namespace EnshroudedSaveEditor.Core.Files;
 
 public enum SaveResult { Saved, GameRunning, ChangedOnDisk, ReadOnly, VerifyFailed }
 
+/// <summary>The three records as bytes, plus the change count: what <see cref="SaveSession.Restore"/> puts back (undo).</summary>
+public sealed record SessionSnapshot(byte[] Character, byte[] Player, byte[] Knowledge, int ChangeCount);
+
 public sealed class SaveSession
 {
     const string CharacterSection = "character_data";
@@ -16,26 +19,49 @@ public sealed class SaveSession
     byte[] _origCharacter;
     byte[] _origPlayer;
     byte[]? _origKnowledge;
+    readonly Func<uint, bool> _isItem;
 
     SaveSession(string path, KsdFile file, byte[] hash, CharacterData character, PlayerCharacter player,
         PlayerKnowledge knowledge, byte[] origCharacter, byte[] origPlayer, byte[]? origKnowledge,
-        string? readOnlyReason)
+        string? readOnlyReason, Func<uint, bool> isItem)
     {
         Path = path; File = file; _hash = hash; Character = character; Player = player; Knowledge = knowledge;
         _origCharacter = origCharacter; _origPlayer = origPlayer; _origKnowledge = origKnowledge;
-        ReadOnlyReason = readOnlyReason;
+        ReadOnlyReason = readOnlyReason; _isItem = isItem;
     }
 
     public string Path { get; }
     public KsdFile File { get; }
     public CharacterData Character { get; set; }
-    public PlayerCharacter Player { get; }
-    public PlayerKnowledge Knowledge { get; }
+    public PlayerCharacter Player { get; private set; }
+    public PlayerKnowledge Knowledge { get; private set; }
     public bool ReadOnly => ReadOnlyReason is not null;
     public string? ReadOnlyReason { get; }
     public int ChangeCount { get; private set; }
 
     public void MarkChanged() => ChangeCount++;
+
+    /// <summary>The records as they stand now, for <see cref="Restore"/>.</summary>
+    public SessionSnapshot Snapshot() => new(Character.ToBytes(), Player.ToBytes(), Knowledge.ToBytes(), ChangeCount);
+
+    /// <summary>
+    /// Puts back a <see cref="Snapshot"/> of this session. The records are read back from its bytes, and nothing
+    /// changes unless all three parse, <c>player_character</c> writes the same bytes again and its inventory is
+    /// recognised as before; otherwise it throws <see cref="KsdFormatException"/>.
+    /// </summary>
+    public void Restore(SessionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        var character = CharacterData.Parse(snapshot.Character);
+        var player = PlayerCharacter.Parse(snapshot.Player, _isItem);
+        var knowledge = PlayerKnowledge.Parse(snapshot.Knowledge);
+        if (player.InventoryStatus != Player.InventoryStatus || !player.ToBytes().AsSpan().SequenceEqual(snapshot.Player))
+            throw new KsdFormatException("The snapshot doesn't read back as it was taken.");
+        Character = character;
+        Player = player;
+        Knowledge = knowledge;
+        ChangeCount = snapshot.ChangeCount;
+    }
 
     public static SaveSession Open(string path, Func<uint, bool> isItem)
     {
@@ -84,7 +110,7 @@ public sealed class SaveSession
         }
 
         var reason = problems.Count == 0 ? null : "Opened read-only: " + string.Join("; ", problems) + ".";
-        return new SaveSession(path, file, hash, character, player, knowledge, cdBytes, pcBytes, knBytes, reason);
+        return new SaveSession(path, file, hash, character, player, knowledge, cdBytes, pcBytes, knBytes, reason, isItem);
     }
 
     public SaveResult Save(BackupService backups, IProcessProbe probe)

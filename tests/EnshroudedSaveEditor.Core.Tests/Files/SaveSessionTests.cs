@@ -1,5 +1,6 @@
 using EnshroudedSaveEditor.Core.Container;
 using EnshroudedSaveEditor.Core.Files;
+using EnshroudedSaveEditor.Core.Records;
 
 namespace EnshroudedSaveEditor.Tests;
 
@@ -126,6 +127,47 @@ public class SaveSessionTests : IDisposable
             Assert.True(o.Block.Span.SequenceEqual(after[o.Name].Block.Span), o.Name);
         Assert.Equal(orig.Revision + 1, after.Revision);
         Assert.Equal(orig.Guid, after.Guid);
+    }
+
+    [Fact]
+    public void Snapshot_restores_the_three_records_and_the_change_count()
+    {
+        var originalPlayer = KsdFile.Parse(File.ReadAllBytes(P))["player_character"].GetData();
+        var s = Open();
+        var before = s.Snapshot();
+
+        s.Character = s.Character.With(name: "Other");
+        s.Player.Level = 9;
+        s.Player.Skills.Clear();
+        s.Player.Container(ContainerKind.Inventory)!.Records.RemoveAt(0);
+        s.MarkChanged();
+        var edited = s.Snapshot();
+        Assert.Equal(1, edited.ChangeCount);
+
+        s.Restore(before);
+        Assert.Equal("Amadis", s.Character.Name);
+        Assert.Equal(7u, s.Player.Level);
+        Assert.Equal(30, s.Player.Skills.Count);
+        Assert.Equal(InventoryStatus.Full, s.Player.InventoryStatus);
+        Assert.Equal(originalPlayer, s.Player.ToBytes());
+        Assert.Equal(0, s.ChangeCount);
+
+        s.Restore(edited);
+        Assert.Equal(("Other", 9u, 1), (s.Character.Name, s.Player.Level, s.ChangeCount));
+        Assert.Equal(SaveResult.Saved, s.Save(Backups, new FakeProbe()));
+        var reopened = Open();
+        Assert.Equal(("Other", 9u), (reopened.Character.Name, reopened.Player.Level));
+        Assert.Empty(reopened.Player.Skills);
+    }
+
+    [Fact]
+    public void Restore_refuses_a_snapshot_that_does_not_read_back()
+    {
+        var s = Open();
+        var good = s.Snapshot();
+        var bad = good with { Player = good.Player[..20] };
+        Assert.ThrowsAny<KsdFormatException>(() => s.Restore(bad));
+        Assert.Equal(7u, s.Player.Level);
     }
 
     [Fact]
