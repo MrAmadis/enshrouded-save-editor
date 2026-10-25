@@ -192,7 +192,7 @@ The layout below comes from Kimikozi's `pc.js`. The points marked verified were 
   - the reward table (id, points, region, for example "Springlands Well II", 3).
 
 **Not in the reference data:**
-- **The level cap and the XP-per-level table.** Read them from the install. If that fails, cap the level at the value the owner sees in-game, and show XP as a raw number without a progress bar. *(my call)*
+- **The level cap and the XP-per-level table.** The 1.0 patch notes put the level cap at **50** (gear goes up to 55 when fully upgraded). Use 50 until the install reader confirms it. The XP table comes from the install; until then, show XP as a raw number without a progress bar. *(my call)*
 - **Backpack size.** Rows per backpack are in the item descriptions ("enlarges your inventory by one row … four rows", for Tiny, Small, Medium and Large, old and `_NEW` versions). The base row count and the columns come from the save and an in-game check (§10.3).
 
 **Sequencing and fallback** *(my calls)*:
@@ -307,11 +307,20 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
 
 Every item below is verified **in the real game**: edit the save, load it in Enshrouded, check the result.
 
+**Owner's rule (2026-10-25): never change any existing save file. Only create a copy of a character save, and modify that copy.**
+- This applies to every file in `remote\` (characters, worlds, `global.ksd`, `user_settings.json`, `backup\`) and to `remotecache.vdf`.
+- The builder (human or agent) never opens a real save for writing, never overwrites one, and never deletes one.
+- Automated tests and the Lab tool work on copies outside the Steam folder.
+- **In-game checks run on a copied character:**
+  - copy one real `characterN.ksd` to the next free number (`character3.ksd` on this machine);
+  - write experiments only into that copy;
+  - nothing else in `remote\` is touched.
+- The copy needs its own identity so the game doesn't confuse it with the original. Give it a new GUID in both the header and `character_data`, and a recognisable name such as "Amadis Test".
+- The first in-game session confirms that the game lists the copy. If it doesn't, stop and ask the owner. Don't fall back to writing anything else.
+- The Lab tool refuses any write whose target already exists and isn't a copy it created itself. The finished editor's own **Save changes** is the only code path that may replace a real character file. It is used only by the owner, after the checks pass.
+
 **How in-game checks work** *(my call, modelled on Stoneshard)*:
-- Experiments run on a **test character**, never on the owner's three real characters, until the checks pass.
-- **First choice:** the owner creates a throwaway character in-game. That gives a game-made `characterN.ksd` (the next free number) with no doubt that the game will list it. The builder writes experiment saves only into that file.
-- If a richer starting point is needed, the builder may copy a real character's sections into the test file. The test file keeps its own GUID.
-- Steam Cloud will sync the test character. That's accepted, and it can be deleted in-game when the checks are done.
+- Steam Cloud will sync the copied test character. That's accepted, and it can be deleted in-game when the checks are done.
 - Give the owner a short numbered checklist per session, and batch experiments so sessions are few. Work that doesn't depend on an answer (the container, the UI, game data) proceeds in parallel.
 
 1. **Round trip:** open and save with no edits gives a file the game loads identically. Then one changed block recompressed with real zstd.
