@@ -37,6 +37,14 @@
             <button class="btn" @onclick="() => _confirmBack = false">Stay</button>
         </Banner>
     }
+    @if (_confirmOverspend)
+    {
+        <Banner Kind="warn">
+            <span>Your skills cost more than this level gives. If you save like this, the game resets your whole skill tree when it loads.</span>
+            <button class="btn confirm-overspend" @onclick="SaveAnyway">Save anyway</button>
+            <button class="btn cancel-overspend" @onclick="() => _confirmOverspend = false">Cancel</button>
+        </Banner>
+    }
     @if (_notice is var (kind, text))
     {
         <Banner Kind="@kind">
@@ -49,7 +57,14 @@
     }
 
     <main class="tab-body">
-        <p class="muted placeholder">The @_tab tab is coming in the next build step.</p>
+        @if (_tab == "Character")
+        {
+            <CharacterTab />
+        }
+        else
+        {
+            <p class="muted placeholder">The @_tab tab is coming in the next build step.</p>
+        }
     </main>
 
     @if (s.Pending.Count > 0)
@@ -74,6 +89,7 @@
     private bool _running;
     private bool _showBackups;
     private bool _confirmBack;
+    private bool _confirmOverspend;
     private bool _offerReload;
     private (string Kind, string Text)? _notice;
     private readonly CancellationTokenSource _stop = new();
@@ -108,6 +124,20 @@
     }
 
     private void Save()
+    {
+        if (EditorService.Current.Points.Available < 0)
+            _confirmOverspend = true;
+        else
+            DoSave();
+    }
+
+    private void SaveAnyway()
+    {
+        _confirmOverspend = false;
+        DoSave();
+    }
+
+    private void DoSave()
     {
         SaveResult result;
         try

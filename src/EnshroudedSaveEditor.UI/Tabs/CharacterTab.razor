@@ -1,0 +1,111 @@
+@implements IDisposable
+@inject EditorService EditorService
+
+@{
+    var s = EditorService.Current;
+    var p = s.Points;
+}
+<div class="character-tab">
+    <section class="panel">
+        <h3>Character</h3>
+        <label class="field-row">
+            <span class="field-label">Name</span>
+            <input type="text" class="name-field" value="@s.Name" disabled="@s.ReadOnly" aria-invalid="@(_nameError is not null)" @onchange="OnName" />
+            <span class="name-limit muted">@CharacterEditor.MaxNameLength characters at most</span>
+        </label>
+        @if (_nameError is not null)
+        {
+            <div class="field-error name-error">@_nameError</div>
+        }
+
+        <div class="field-row">
+            <span class="field-label">Level</span>
+            <div class="level-stepper">
+                <Stepper Value="s.Level" Min="1" Max="s.LevelCap" ShowMax="true" Disabled="s.ReadOnly" OnCommit="OnLevel" />
+            </div>
+        </div>
+        @if (_levelError is not null)
+        {
+            <div class="field-error">@_levelError</div>
+        }
+
+        <div class="field-row">
+            <span class="field-label">XP</span>
+            <span class="xp-field">
+                <NumberField Value="s.Xp" Min="0" Max="uint.MaxValue" Disabled="s.ReadOnly" OnCommit="OnXp" />
+            </span>
+            @if (s.XpToNextLevel is { } need && s.Level < s.LevelCap)
+            {
+                <span class="xp-next muted">of @need to level @(s.Level + 1)</span>
+            }
+        </div>
+        @if (_xpError is not null)
+        {
+            <div class="field-error">@_xpError</div>
+        }
+    </section>
+
+    <section class="panel">
+        <h3>Skill points</h3>
+        <dl class="points">
+            <dt>From levels</dt><dd data-points="From levels">@p.FromLevels</dd>
+            <dt>Elixir Wells &amp; Shroud Roots</dt><dd data-points="Elixir Wells &amp; Shroud Roots">@p.FromRewards</dd>
+            <dt>Spent</dt><dd data-points="Spent">@p.Spent</dd>
+            <dt>Available</dt><dd data-points="Available" class="@(p.Available < 0 ? "negative" : "")">@p.Available</dd>
+        </dl>
+        @if (p.Available < 0)
+        {
+            <Banner Kind="error"><span class="overspend">Your skills cost more than this level gives. Refund skills first.</span></Banner>
+        }
+    </section>
+</div>
+
+@code {
+    private string? _nameError;
+    private string? _levelError;
+    private string? _xpError;
+
+    protected override void OnInitialized() => EditorService.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => EditorService.Changed -= OnChanged;
+
+    private void OnName(ChangeEventArgs e)
+    {
+        var name = (e.Value?.ToString() ?? "").Trim();
+        if (name == EditorService.Current.Name)
+        {
+            _nameError = null;
+            return;
+        }
+        _nameError = Try(() => EditorService.SetName(name));
+    }
+
+    private void OnLevel(long level)
+    {
+        if (level == EditorService.Current.Level)
+            return;
+        _levelError = Try(() => EditorService.SetLevel((int)level));
+    }
+
+    private void OnXp(long xp)
+    {
+        if (xp == EditorService.Current.Xp)
+            return;
+        _xpError = Try(() => EditorService.SetXp(xp));
+    }
+
+    private static string? Try(Action edit)
+    {
+        try
+        {
+            edit();
+            return null;
+        }
+        catch (EditRejectedException e)
+        {
+            return e.Message;
+        }
+    }
+}

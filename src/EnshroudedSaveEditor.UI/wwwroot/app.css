@@ -244,3 +244,25 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .dialog-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
 
 #blazor-error-ui { background: #3a1626; color: #f0bccb; }
+
+/* Character tab */
+.character-tab { display: grid; gap: 22px; max-width: 640px; margin: 0 auto; }
+.character-tab .panel { padding: 18px 20px; }
+.field-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+.field-label { width: 70px; color: var(--dim); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+.name-field {
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--text);
+    padding: 7px 10px;
+    font: inherit;
+    width: 220px;
+}
+.name-field[aria-invalid="true"] { border-color: var(--shroud); }
+.name-field:disabled { opacity: .5; }
+.xp-next { font-size: 13px; }
+.points { display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; }
+.points dt { color: var(--dim); }
+.points dd { text-align: right; font-weight: 600; color: var(--gold-2); }
+.points dd.negative { color: #e5586f; }
+.points .banner { margin-top: 12px; }
