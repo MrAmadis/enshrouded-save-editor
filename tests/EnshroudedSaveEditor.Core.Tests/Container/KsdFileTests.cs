@@ -95,6 +95,7 @@ public class KsdFileTests
             var tableAt = 0x28 + (int)BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(0x28));
             BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(tableAt + 8), (uint)b.Length);
         })));
+        Assert.Throws<KsdFormatException>(() => KsdFile.Parse(With(b => BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(36), 0xFFFFFFFF))));
         Assert.Throws<KsdFormatException>(() => KsdFile.Parse(new byte[10]));
     }
 

@@ -12,6 +12,7 @@ public sealed class KsdFile
     private const int HeaderSize = 48;
     private const int EntrySize = 20;
     private const int MaxSections = 4096;
+    private const long MaxUnixSeconds = 253402300799; // 9999-12-31T23:59:59Z
     private static readonly byte[] Magic = "SV2C"u8.ToArray();
 
     private readonly byte[] _header;
@@ -25,7 +26,9 @@ public sealed class KsdFile
         Version = BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(4));
         _guid = header.AsSpan(12, 16).ToArray();
         Revision = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(28));
-        SavedAt = DateTimeOffset.FromUnixTimeSeconds((long)BinaryPrimitives.ReadUInt64LittleEndian(header.AsSpan(32)));
+        var seconds = BinaryPrimitives.ReadUInt64LittleEndian(header.AsSpan(32));
+        if (seconds > (ulong)MaxUnixSeconds) throw new KsdFormatException("Save timestamp is out of range.");
+        SavedAt = DateTimeOffset.FromUnixTimeSeconds((long)seconds);
     }
 
     public ushort Version { get; }
