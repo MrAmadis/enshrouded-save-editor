@@ -1,0 +1,8 @@
+bin/
+obj/
+artifacts/
+TestResults/
+.vs/
+.superpowers/
+tests/fixtures/real/
+tests/fixtures/experiments/
