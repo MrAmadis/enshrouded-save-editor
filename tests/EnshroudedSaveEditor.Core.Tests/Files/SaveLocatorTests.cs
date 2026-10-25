@@ -67,4 +67,21 @@ public class SaveLocatorTests : IDisposable
 
     [Fact]
     public void DefaultRoots_does_not_throw() => Assert.NotNull(SaveLocator.DefaultRoots());
+
+    [Theory]
+    [InlineData("character_data")]
+    [InlineData("player_character")]
+    public void Truncated_record_is_damaged_while_others_stay_ok(string section)
+    {
+        var p = Path.Combine(_tmp, "character0.ksd");
+        var f = KsdFile.Parse(File.ReadAllBytes(p));
+        f[section].SetData(new byte[] { 1, 2, 3 });
+        File.WriteAllBytes(p, f.ToBytes());
+        var list = new SaveLocator().Scan(_tmp);
+        Assert.Equal(3, list.Count);
+        var bad = list.Single(c => c.FileName == "character0.ksd");
+        Assert.NotEqual(CharacterStatus.Ok, bad.Status);
+        Assert.False(string.IsNullOrWhiteSpace(bad.StatusMessage));
+        Assert.All(list.Where(c => c != bad), c => Assert.Equal(CharacterStatus.Ok, c.Status));
+    }
 }

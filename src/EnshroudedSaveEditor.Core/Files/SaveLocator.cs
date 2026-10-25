@@ -100,7 +100,7 @@ public sealed partial class SaveLocator
 
         KsdFile file;
         try { file = KsdFile.Parse(File.ReadAllBytes(path)); }
-        catch (Exception e) when (e is KsdFormatException or IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception e)
         { return Fail(CharacterStatus.Damaged, e.Message); }
 
         try
@@ -133,7 +133,7 @@ public sealed partial class SaveLocator
                 file.Revision, file.SavedAt, CharacterStatus.Ok, null);
         }
         catch (UnsupportedLayoutException e) { return Fail(CharacterStatus.Unsupported, e.Message, file); }
-        catch (Exception e) when (e is KsdFormatException or InvalidDataException or ArgumentException or IndexOutOfRangeException)
+        catch (Exception e)
         { return Fail(CharacterStatus.Damaged, e.Message, file); }
     }
 }
