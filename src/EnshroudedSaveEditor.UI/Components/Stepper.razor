@@ -1,0 +1,31 @@
+<div class="stepper">
+    <button class="minus" disabled="@(Disabled || Value <= Min)" @onclick="() => Commit(Value - 1)" aria-label="Decrease">−</button>
+    <NumberField Value="Value" Min="Min" Max="Max" Disabled="Disabled" OnCommit="OnCommit" />
+    <button class="plus" disabled="@(Disabled || Value >= Max)" @onclick="() => Commit(Value + 1)" aria-label="Increase">+</button>
+    @if (ShowMax)
+    {
+        <span class="max">max @Max</span>
+    }
+</div>
+@if (Chips is { Count: > 0 })
+{
+    <div class="chips">
+        @foreach (var (label, target) in Chips)
+        {
+            var t = target;
+            <button class="chip" disabled="@(Disabled || t == Value)" @onclick="() => Commit(t)">@label</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public long Value { get; set; }
+    [Parameter] public long Min { get; set; } = long.MinValue;
+    [Parameter] public long Max { get; set; } = long.MaxValue;
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ShowMax { get; set; }
+    [Parameter] public IReadOnlyList<(string Label, long Value)>? Chips { get; set; }
+    [Parameter] public EventCallback<long> OnCommit { get; set; }
+
+    private Task Commit(long value) => OnCommit.InvokeAsync(Math.Clamp(value, Min, Max));
+}

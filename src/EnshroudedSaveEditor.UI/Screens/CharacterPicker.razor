@@ -1,0 +1,118 @@
+@implements IDisposable
+@inject EditorService EditorService
+
+<div class="picker">
+    <header class="picker-header">
+        <div class="logo">ENSHROUDED<small>SAVE EDITOR</small></div>
+        <p class="muted">Choose a character to edit. Every save keeps a backup of the previous version.</p>
+    </header>
+
+    @if (_running)
+    {
+        <Banner>Enshrouded is running. Close it to save.</Banner>
+    }
+    @if (!_savesFound)
+    {
+        <Banner Kind="error">
+            <span>No Enshrouded saves found.</span>
+            <button class="btn choose-saves" @onclick="ChooseFolder">Choose saves folder</button>
+        </Banner>
+    }
+    @if (_error is not null)
+    {
+        <Banner Kind="error">@_error</Banner>
+    }
+
+    @foreach (var group in _characters.GroupBy(c => SourceTag(c.Path)).OrderBy(g => g.Key is null ? 2 : g.Key == "Steam" ? 0 : 1))
+    {
+        @if (group.Key is not null)
+        {
+            <h3 class="group-title">@(group.Key == "Steam" ? "Steam characters" : "Local characters")</h3>
+        }
+        <div class="characters">
+            @foreach (var character in group)
+            {
+                var path = character.Path;
+                var tag = SourceTag(path);
+                <button class="panel character-card @(character.Status == CharacterStatus.Ok ? "" : "card-problem")" data-file="@character.FileName" @onclick="() => Open(path)">
+                    <span class="card-top">
+                        <span class="card-name">@character.Name</span>
+                        @if (tag is not null)
+                        {
+                            <span class="tag tag-@tag.ToLowerInvariant()">@tag</span>
+                        }
+                        @if (character.Status != CharacterStatus.Ok)
+                        {
+                            <span class="chip chip-problem" title="@character.StatusMessage">@character.Status</span>
+                        }
+                    </span>
+                    @if (character.Status == CharacterStatus.Ok)
+                    {
+                        <span class="card-level">Level @character.Level</span>
+                    }
+                    <span class="muted">@character.FileName · @character.SavedAtLocal.ToString("MMM d, yyyy HH:mm", CultureInfo.InvariantCulture)</span>
+                    @if (character.UnspentPoints is { } points)
+                    {
+                        <span class="card-points">@(points < 0 ? $"Overspent by {-points} {(points == -1 ? "point" : "points")}" : $"{points} {(points == 1 ? "point" : "points")} to spend")</span>
+                    }
+                    @if (character.StatusMessage is not null)
+                    {
+                        <span class="card-warning">@character.StatusMessage</span>
+                    }
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private IReadOnlyList<CharacterView> _characters = [];
+    private bool _savesFound = true;
+    private bool _running;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        EditorService.Changed += OnChanged;
+        Refresh();
+    }
+
+    private void OnChanged() => InvokeAsync(() =>
+    {
+        Refresh();
+        StateHasChanged();
+    });
+
+    private void Refresh()
+    {
+        _savesFound = EditorService.SavesFound;
+        _characters = EditorService.Characters();
+        _running = EditorService.GameRunning();
+    }
+
+    /// <summary>"Steam" for a Steam remote folder, "Local" for Saved Games\keen games, otherwise null.</summary>
+    internal static string? SourceTag(string path)
+    {
+        var p = path.Replace('/', '\\');
+        if (p.Contains(@"\userdata\", StringComparison.OrdinalIgnoreCase))
+            return "Steam";
+        return p.Contains(@"\keen games\", StringComparison.OrdinalIgnoreCase) ? "Local" : null;
+    }
+
+    private void Open(string path)
+    {
+        try
+        {
+            _error = null;
+            EditorService.Open(path);
+        }
+        catch (EditRejectedException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private void ChooseFolder() => EditorService.ChooseSavesFolder();
+
+    public void Dispose() => EditorService.Changed -= OnChanged;
+}

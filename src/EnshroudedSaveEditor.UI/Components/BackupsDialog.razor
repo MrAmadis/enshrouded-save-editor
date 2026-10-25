@@ -1,0 +1,61 @@
+@inject EditorService EditorService
+
+<div class="dialog-backdrop" @onclick="OnClose">
+    <div class="dialog panel" @onclick:stopPropagation="true" role="dialog" aria-label="Backups">
+        <h3>Backups of this character</h3>
+        <p class="muted">A backup is made every time you save or restore. Restoring puts the backup in place of the current file (which is backed up first).</p>
+        @if (_error is not null)
+        {
+            <Banner Kind="error">@_error</Banner>
+        }
+        @if (_confirm is { } pending)
+        {
+            <Banner Kind="warn">
+                <span>Restore the backup from @Stamp(pending)? Unsaved edits are dropped.</span>
+                <button class="btn danger confirm-restore" @onclick="() => Restore(pending)">Restore</button>
+                <button class="btn cancel" @onclick="() => _confirm = null">Cancel</button>
+            </Banner>
+        }
+        @if (_backups.Count == 0)
+        {
+            <p class="muted">No backups yet.</p>
+        }
+        <ul class="backup-list">
+            @foreach (var backup in _backups)
+            {
+                var b = backup;
+                <li>
+                    <span>@Stamp(b)</span>
+                    <button class="btn restore" @onclick="() => _confirm = b">Restore</button>
+                </li>
+            }
+        </ul>
+        <div class="dialog-actions"><button class="btn close" @onclick="OnClose">Close</button></div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private IReadOnlyList<BackupInfo> _backups = [];
+    private string? _error;
+    private BackupInfo? _confirm;
+
+    protected override void OnInitialized() => _backups = EditorService.Backups();
+
+    private static string Stamp(BackupInfo b) => b.Created.ToLocalTime().ToString("MMM d, yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+
+    private async Task Restore(BackupInfo backup)
+    {
+        _confirm = null;
+        try
+        {
+            EditorService.Restore(backup.Path);
+            await OnClose.InvokeAsync();
+        }
+        catch (EditRejectedException e)
+        {
+            _error = e.Message;
+        }
+    }
+}

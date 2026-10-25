@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>EnshroudedSaveEditor</AssemblyName>
+    <RootNamespace>EnshroudedSaveEditor.App</RootNamespace>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- The WebView2 package ships a WPF assembly whose WindowsBase reference overlaps the WinForms one; harmless. -->
+    <NoWarn>$(NoWarn);MSB3277</NoWarn>
+    <!-- BlazorWebView serves index.html and _content/ from files beside the app, so a single-file exe extracts them on first run. -->
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnshroudedSaveEditor.UI\EnshroudedSaveEditor.UI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.WindowsForms" Version="10.0.120" />
+  </ItemGroup>
+
+  <!-- The SDK copies static web assets (wwwroot, _content/, _framework/) to the publish folder on their own,
+       after the single-file bundle is built and outside ResolvedFileToPublish, so the bundler never sees them.
+       Compute them early with the SDK's own targets and hand them to the bundler. -->
+  <Target Name="BundleStaticWebAssets" BeforeTargets="_ComputeFilesToBundle" Condition="'$(PublishSingleFile)' == 'true'"
+          DependsOnTargets="StaticWebAssetsPrepareForPublish;LoadStaticWebAssetsPublishManifest;_SplitPublishStaticWebAssetsByCopyOptions">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="@(_PublishStaticWebAssetsTargetPath)" RelativePath="%(_PublishStaticWebAssetsTargetPath.TargetPath)" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+    <!-- Without them the exe would start with a blank "There is no content at" page; better to stop here. -->
+    <Error Condition="'@(_PublishStaticWebAssetsTargetPath)' == ''"
+           Text="No static web assets to bundle: the .NET SDK's publish targets changed. Update BundleStaticWebAssets in this project." />
+  </Target>
+
+</Project>

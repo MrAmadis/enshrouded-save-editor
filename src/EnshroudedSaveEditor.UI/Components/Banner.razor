@@ -1,0 +1,7 @@
+<div class="banner banner-@Kind" role="status">@ChildContent</div>
+
+@code {
+    /// <summary>warn, error or info.</summary>
+    [Parameter] public string Kind { get; set; } = "warn";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

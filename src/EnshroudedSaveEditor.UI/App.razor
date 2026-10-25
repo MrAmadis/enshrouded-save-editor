@@ -1,0 +1,19 @@
+@implements IDisposable
+@inject EditorService EditorService
+
+@if (EditorService.IsOpen)
+{
+    <Editor />
+}
+else
+{
+    <CharacterPicker />
+}
+
+@code {
+    protected override void OnInitialized() => EditorService.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => EditorService.Changed -= OnChanged;
+}

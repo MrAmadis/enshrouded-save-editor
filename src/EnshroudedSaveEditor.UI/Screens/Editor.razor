@@ -1,0 +1,171 @@
+@implements IDisposable
+@inject EditorService EditorService
+
+@{
+    var s = EditorService.Current;
+}
+<div class="editor">
+    <header class="topbar">
+        <button class="btn back" @onclick="Back" title="Back to all characters">◂ Characters</button>
+        <div class="logo">ENSHROUDED<small>SAVE EDITOR</small></div>
+        <div class="who"><b>@s.Name</b>@($" · Level {s.Level} · {s.FileName}")</div>
+        <div class="spacer"></div>
+        <button class="btn backups" @onclick="() => _showBackups = true">Backups</button>
+        <button class="btn gold save" disabled="@(_running || s.ReadOnly || s.Pending.Count == 0)" @onclick="Save">Save changes</button>
+    </header>
+    <nav class="tabs">
+        @foreach (var tab in Tabs)
+        {
+            var t = tab;
+            <button class="tab @(t == _tab ? "on" : "")" @onclick="() => _tab = t">@t</button>
+        }
+    </nav>
+
+    @if (_running)
+    {
+        <Banner>Enshrouded is running. Close it to save.</Banner>
+    }
+    @if (s.ReadOnly)
+    {
+        <Banner Kind="error">This save is read-only: @s.ReadOnlyReason</Banner>
+    }
+    @if (_confirmBack)
+    {
+        <Banner Kind="warn">
+            <span>Leave this character and drop @s.Pending.Count unsaved @(s.Pending.Count == 1 ? "edit" : "edits")?</span>
+            <button class="btn discard" @onclick="Discard">Drop and leave</button>
+            <button class="btn" @onclick="() => _confirmBack = false">Stay</button>
+        </Banner>
+    }
+    @if (_notice is var (kind, text))
+    {
+        <Banner Kind="@kind">
+            <span>@text</span>
+            @if (_offerReload)
+            {
+                <button class="btn reload" @onclick="Reload">Reload</button>
+            }
+        </Banner>
+    }
+
+    <main class="tab-body">
+        <p class="muted placeholder">The @_tab tab is coming in the next build step.</p>
+    </main>
+
+    @if (s.Pending.Count > 0)
+    {
+        <div class="pending">
+            <span>Unsaved: <b>@string.Join(" · ", s.Pending)</b></span>
+            <span class="hint">Nothing touches your save until you press Save changes, and a backup is made first.</span>
+        </div>
+    }
+
+    @if (_showBackups)
+    {
+        <BackupsDialog OnClose="CloseBackups" />
+    }
+</div>
+
+@code {
+    private static readonly string[] Tabs = ["Character", "Inventory", "Skills"];
+    private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(3);
+
+    private string _tab = Tabs[0];
+    private bool _running;
+    private bool _showBackups;
+    private bool _confirmBack;
+    private bool _offerReload;
+    private (string Kind, string Text)? _notice;
+    private readonly CancellationTokenSource _stop = new();
+
+    protected override void OnInitialized()
+    {
+        EditorService.Changed += OnChanged;
+        _running = EditorService.GameRunning();
+        _ = PollGame();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    /// <summary>Re-checks every few seconds whether Enshrouded is running, which blocks saving.</summary>
+    private async Task PollGame()
+    {
+        using var timer = new PeriodicTimer(PollInterval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stop.Token))
+            {
+                var running = EditorService.GameRunning();
+                if (running == _running)
+                    continue;
+                _running = running;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void Save()
+    {
+        SaveResult result;
+        try
+        {
+            result = EditorService.Save();
+        }
+        catch (EditRejectedException e)
+        {
+            (_notice, _offerReload) = (("error", e.Message), false);
+            return;
+        }
+        _offerReload = result == SaveResult.ChangedOnDisk;
+        _notice = result switch
+        {
+            SaveResult.Saved => ("info", "Saved. Backup kept."),
+            SaveResult.GameRunning => ("warn", "Enshrouded is running. Close it to save."),
+            SaveResult.ChangedOnDisk => ("error", "The file changed since you opened it."),
+            SaveResult.VerifyFailed => ("error", "Save check failed; your file was restored from the backup."),
+            _ => ("error", $"This save is read-only: {EditorService.Current.ReadOnlyReason}"),
+        };
+        _running = result == SaveResult.GameRunning || _running;
+    }
+
+    private void Reload()
+    {
+        try
+        {
+            EditorService.Reload();
+            _notice = null;
+        }
+        catch (EditRejectedException e)
+        {
+            _notice = ("error", e.Message);
+        }
+        _offerReload = false;
+    }
+
+    private void CloseBackups()
+    {
+        _showBackups = false;
+        _notice = null;
+        _offerReload = false;
+    }
+
+    private void Back()
+    {
+        if (EditorService.Current.Pending.Count > 0)
+            _confirmBack = true;
+        else
+            EditorService.Close();
+    }
+
+    private void Discard() => EditorService.Close();
+
+    public void Dispose()
+    {
+        EditorService.Changed -= OnChanged;
+        _stop.Cancel();
+        _stop.Dispose();
+    }
+}

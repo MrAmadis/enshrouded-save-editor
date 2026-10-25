@@ -31,3 +31,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Cinzel and Source Sans 3 (SIL Open Font License 1.1)
+
+- **Cinzel:** copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel). License text: `src/EnshroudedSaveEditor.UI/wwwroot/fonts/OFL-Cinzel.txt`.
+- **Source Sans 3:** copyright 2010-2020 Adobe, with Reserved Font Name "Source". License text: `src/EnshroudedSaveEditor.UI/wwwroot/fonts/OFL-SourceSans3.txt`.
+- **What we use:** the latin-subset variable woff2 files as served by Google Fonts (`Cinzel.woff2`, `SourceSans3.woff2`), unmodified, bundled with the app so it needs no network. They are used for headings and body text.
