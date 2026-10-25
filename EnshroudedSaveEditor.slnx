@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/EnshroudedSaveEditor.Core/EnshroudedSaveEditor.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EnshroudedSaveEditor.Core.Tests/EnshroudedSaveEditor.Core.Tests.csproj" />
+  </Folder>
+</Solution>
