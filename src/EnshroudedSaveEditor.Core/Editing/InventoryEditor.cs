@@ -40,13 +40,12 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         s.MarkChanged();
     }
 
-    /// <summary>Within the item's level range (0 to 255 for an item missing from the game data); the record must have a level.</summary>
+    /// <summary>1 to <see cref="InventoryLayout.MaxItemLevel"/> for any item; the record must have a level.</summary>
     public void SetItemLevel(ItemRef r, int level)
     {
         var rec = Item(r);
         if (rec.Level is not { } current) throw new EditRejectedException($"{NameOf(rec)} has no item level.");
-        var (min, max) = items.Find(rec.ItemId) is { } info ? LevelRange(info) : (0, byte.MaxValue);
-        if (level < min || level > max) throw new EditRejectedException($"The level must be between {min} and {max}.");
+        EnsureLevelInRange(level);
         if (level == current) throw new EditRejectedException($"Already level {level}");
         rec.Level = (byte)level;
         s.MarkChanged();
@@ -132,8 +131,7 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         EnsureFull();
         var maxStack = MaxStack(info);
         if (count < 1 || count > maxStack) throw new EditRejectedException($"The count must be between 1 and {maxStack}.");
-        var (min, max) = LevelRange(info);
-        if (level is { } l && (l < min || l > max)) throw new EditRejectedException($"The level must be between {min} and {max}.");
+        if (level is { } l) EnsureLevelInRange(l);
         if (rarity is { } v && !Enum.IsDefined(v)) throw new EditRejectedException("Unknown rarity.");
 
         ItemRef at;
@@ -236,5 +234,10 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
 
     static int MaxStack(ItemInfo info) => Math.Clamp(info.MaxStack, 1, ushort.MaxValue);
 
-    static (int Min, int Max) LevelRange(ItemInfo info) => NewItemFields.LevelRange(info);
+    /// <summary>T10-R1: 1 to <see cref="InventoryLayout.MaxItemLevel"/> for every item, whatever its reference range.</summary>
+    static void EnsureLevelInRange(int level)
+    {
+        if (level < 1 || level > InventoryLayout.MaxItemLevel)
+            throw new EditRejectedException($"The level must be between 1 and {InventoryLayout.MaxItemLevel}.");
+    }
 }

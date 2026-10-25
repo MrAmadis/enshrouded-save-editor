@@ -25,7 +25,7 @@ public static class NewItemFields
     /// durability, rarity and a gem socket (<c>0x33</c>), and everything else no fields.
     /// <para>
     /// Where the field set has them: level is <paramref name="level"/>, or else the character's level clamped to
-    /// the item's range; rarity is <paramref name="rarity"/>, or else the base rarity, with the extra byte 0;
+    /// the item's reference range, or no level at all when that range is 0–0 (T10-R1); rarity is <paramref name="rarity"/>, or else the base rarity, with the extra byte 0;
     /// durability is full, at the copied record's maximum, or for the defaults that of the first weapon record in
     /// <paramref name="pc"/> (needs <paramref name="items"/>), or else 100; the gem socket is empty. A level or
     /// rarity the field set has no room for is not added: the caller checks the returned record.
@@ -64,7 +64,7 @@ public static class NewItemFields
                 && items?.Find(r.ItemId)?.Category == ItemCategory.Weapons)?.Durability?.Max ?? 100;
         }
 
-        if ((flags & LevelBit) != 0) rec.Level = (byte)(level ?? DefaultLevel(info, pc.Level));
+        if ((flags & LevelBit) != 0) rec.Level = level is { } l ? (byte)l : DefaultLevel(info, pc.Level);
         if ((flags & DurabilityBit) != 0) rec.Durability = (durability, durability);
         if ((flags & RarityBit) != 0) rec.Rarity = ((byte)(rarity ?? info.BaseRarity), 0);
         if ((flags & GemBit) != 0) rec.Gem = (0, 0);
@@ -81,16 +81,15 @@ public static class NewItemFields
         _ => 0x00,
     };
 
-    static int DefaultLevel(ItemInfo info, uint characterLevel)
+    /// <summary>
+    /// T10-R1: the character's level clamped to the item's reference range, or no level (no field) when the item
+    /// has no level range (max level 0). The range is used only here, not to bound edits.
+    /// </summary>
+    static byte? DefaultLevel(ItemInfo info, uint characterLevel)
     {
-        var (min, max) = LevelRange(info);
-        return (int)Math.Clamp(characterLevel, (uint)min, (uint)max);
-    }
-
-    /// <summary>The item's level range, kept within a byte (the record's level is a u8).</summary>
-    internal static (int Min, int Max) LevelRange(ItemInfo info)
-    {
-        var min = Math.Clamp(info.MinLevel, 0, byte.MaxValue);
-        return (min, Math.Clamp(info.MaxLevel, min, byte.MaxValue));
+        if (info.MaxLevel <= 0) return null;
+        var max = Math.Min(info.MaxLevel, byte.MaxValue);
+        var min = Math.Clamp(info.MinLevel, 0, max);
+        return (byte)Math.Clamp(characterLevel, (uint)min, (uint)max);
     }
 }

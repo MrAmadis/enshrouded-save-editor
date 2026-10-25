@@ -22,7 +22,8 @@ public class InventoryEditorTests : IDisposable
     const uint WolfsSnarlLongbow = 0x29433573;  // Weapons/Weapon/RangedBow, levels 1–50
     const uint RingOfHealth = 0xf29b7aa9;       // Equipment/Ring, levels 10–10, base Uncommon
     const uint WaxTorch = 0xe9430638;           // Weapons/Weapon/OneHandWeapon, levels 3–3
-    const uint WaterPouch = 0xe4831ad8;         // character2 Inventory 28, flags 04 (bit-2 bytes)
+    const uint WaterPouch = 0xe4831ad8;         // character2 Inventory 28, flags 04 (bit-2 bytes); levels 0–0
+    const uint AdventurerHelmet = 0xff1b25e5;   // Equipment/Helmet, levels 10–10
     const uint ScorchingWand = 0xe589d7a4;      // character2 Inventory 16, flags 33, durability 352/363
 
     const string NeedsFull = "Adding and moving items isn't available for this character yet";
@@ -116,8 +117,8 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(3, s.ChangeCount);
 
         var before = s.Player.ToBytes();
-        Rejected(() => e.SetItemLevel(wand, 0));                   // levels 1–50
-        Rejected(() => e.SetItemLevel(wand, 51));
+        Rejected(() => e.SetItemLevel(wand, 0));                   // levels 1–55
+        Rejected(() => e.SetItemLevel(wand, 56));
         Rejected(() => e.SetRarity(wand, (Rarity)9));
         Rejected(() => e.SetDurability(wand, 401, 400));
         Rejected(() => e.SetDurability(wand, 0, 0));
@@ -146,6 +147,29 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(11, eq.Count);
         Assert.Equal((byte)5, eq[0].Level);
         Assert.Equal(((byte)Rarity.Epic, (byte)5), eq[0].Rarity);
+    }
+
+    // T10-R1: the reference level range doesn't bound real records (this chest is level 10 against 5–5).
+    [Fact]
+    public void Item_levels_run_from_1_to_55_whatever_the_reference_range()
+    {
+        var s = Open(); var e = Ed(s);
+        var chest = Eq(1);                                         // Alchemist Apprentice Chest: level 10, reference 5–5
+        Assert.Equal((byte)10, e.At(chest)!.Level);
+        e.SetItemLevel(chest, 12);
+        Assert.Equal((byte)12, e.At(chest)!.Level);
+        e.SetItemLevel(chest, 55);
+        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.SetItemLevel(chest, 0)).Message);
+        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.SetItemLevel(chest, 56)).Message);
+
+        var helmet = e.Add(Item(AdventurerHelmet), 1, 55, Rarity.Rare, null);     // reference 10–10
+        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.Add(Item(AdventurerHelmet), 1, 56, null, null)).Message);
+        Rejected(() => e.Add(Item(AdventurerHelmet), 1, 0, null, null));
+        Assert.Equal(3, s.ChangeCount);
+
+        var re = Reparsed(s);
+        Assert.Equal((byte)55, Records(re, ContainerKind.Equipped)[1].Level);
+        Assert.Equal((byte)55, Records(re, ContainerKind.Inventory).Single(r => r.Slot == helmet.Slot).Level);
     }
 
     [Fact]
@@ -202,7 +226,8 @@ public class InventoryEditorTests : IDisposable
         Rejected(() => e.Add(ore, 0, null, null, null));
         Rejected(() => e.Add(ore, 251, null, null, null));
         Rejected(() => e.Add(bow, 2, 20, Rarity.Epic, null));        // gear stacks to 1
-        Rejected(() => e.Add(bow, 1, 51, null, null));
+        Rejected(() => e.Add(bow, 1, 56, null, null));               // levels 1–55
+        Rejected(() => e.Add(bow, 1, 0, null, null));
         Rejected(() => e.Add(bow, 1, 20, (Rarity)0, null));
         Rejected(() => e.Add(ore, 1, 13, null, null));               // a material has no level field
         Rejected(() => e.Add(ore, 1, null, Rarity.Rare, null));      // …or rarity field
@@ -451,6 +476,16 @@ public class InventoryEditorTests : IDisposable
         var pouch = NewItemFields.Create(Item(WaterPouch), 0, 1, null, null, pc, _items);
         Assert.Equal(0x04, pouch.Flags);
         Assert.Equal(inv.Single(r => r.ItemId == WaterPouch).Bit2, pouch.Bit2);
+
+        // T10-R1: character1's first Water Pouch has a level field (flags 05, level 0), but the item has no level
+        // range (0–0), so a new one gets no level by default; an explicit level still sets it.
+        var pc1 = Open("character1.ksd").Player;
+        var template1 = Records(pc1, ContainerKind.Inventory).First(r => r.ItemId == WaterPouch);
+        Assert.Equal(0x05, template1.Flags);
+        var pouch1 = NewItemFields.Create(Item(WaterPouch), 0, 1, null, null, pc1, _items);
+        Assert.Equal(0x04, pouch1.Flags);
+        Assert.Equal(template1.Bit2, pouch1.Bit2);
+        Assert.Equal((byte)3, NewItemFields.Create(Item(WaterPouch), 0, 1, 3, null, pc1, _items).Level);
 
         // Same id: full durability and an empty socket, whatever the template holds.
         inv.Single(r => r.ItemId == ScorchingWand).Gem = (0x12345678, 1);

@@ -18,6 +18,13 @@ public static class InventoryLayout
     public const int Columns = 8;               // confirmed in-game: no
 
     /// <summary>
+    /// The highest item level an edit may set (the lowest is 1), for any record with a level field. The reference
+    /// level ranges don't bound real records (e.g. Alchemist Apprentice pieces at level 10 against 5–5), so they
+    /// only give the default level of an added item.
+    /// </summary>
+    public const int MaxItemLevel = 55;         // confirmed in-game: no — 1.0 patch notes: equipment max level 55
+
+    /// <summary>
     /// Whether the Equipped slot numbers are known to mean fixed positions. Until then nothing moves into,
     /// out of or within Equipped, and no Equipped record is added or removed.
     /// </summary>
