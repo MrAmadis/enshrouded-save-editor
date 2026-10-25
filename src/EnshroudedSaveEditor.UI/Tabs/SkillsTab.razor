@@ -1,0 +1,264 @@
+@implements IDisposable
+@inject EditorService EditorService
+
+@{
+    var s = EditorService.Current;
+    var p = s.Points;
+    var shownId = _hover != 0 ? _hover : _messageNode;
+    var shown = _message is not null || _hover != 0 ? s.Nodes.FirstOrDefault(n => n.Id == shownId) : null;
+}
+<div class="skills-tab">
+    <div class="panel tree-panel">
+        <div class="hint">Scroll to zoom · drag to pan · click an archetype name to fly there · click a node to learn or unlearn</div>
+        <div class="zoom">
+            <button class="zin" title="Zoom in" @onclick="() => Zoom(0.7)">+</button>
+            <button class="zout" title="Zoom out" @onclick="() => Zoom(1 / 0.7)">−</button>
+            <button class="zfit fit" title="Show the whole tree" @onclick="Fit">FIT</button>
+            <div class="zoomlvl"></div>
+        </div>
+        @if (_message is not null || shown is not null)
+        {
+            <div class="tip">
+                @if (shown is not null)
+                {
+                    <b class="tip-name">@shown.Name</b>
+                    <span class="tip-meta">rank @Rank(shown)/@shown.MaxRank · cost @shown.Cost</span>
+                    <p class="tip-desc">@shown.Description</p>
+                    <p class="tip-action">@ActionText(shown)</p>
+                }
+                @if (_message is not null)
+                {
+                    <p class="tip-message">@_message</p>
+                }
+            </div>
+        }
+        <SkillTree @ref="_tree" Nodes="s.Nodes" Links="s.Links" Labels="s.Labels" Selected="_found"
+                   OnNodeClicked="OnNodeClicked" OnNodeHovered="OnNodeHovered" />
+        <div class="legend">
+            <span><i class="lg-learned"></i>learned</span>
+            <span><i class="lg-next"></i>can learn next</span>
+            <span><i class="lg-locked"></i>locked</span>
+            <span><i style="background:#86a8ff"></i>mage</span>
+            <span><i style="background:#7fc76a"></i>ranger</span>
+            <span><i style="background:#e58a5a"></i>warrior</span>
+        </div>
+    </div>
+
+    <div class="skills-side">
+        <section class="panel">
+            <h3>Skill points</h3>
+            <dl class="points">
+                <dt>From levels</dt><dd data-points="From levels">@p.FromLevels</dd>
+                <dt>Elixir Wells &amp; Shroud Roots</dt><dd data-points="Elixir Wells &amp; Shroud Roots">@p.FromRewards</dd>
+                <dt>Spent</dt><dd data-points="Spent">@p.Spent</dd>
+                <dt>Available</dt><dd data-points="Available" class="@(p.Available < 0 ? "negative" : "")">@p.Available</dd>
+            </dl>
+            @if (p.Available < 0)
+            {
+                <Banner Kind="error"><span class="overspend">Your skills cost more than this level gives. Refund skills first.</span></Banner>
+            }
+        </section>
+
+        <section class="panel">
+            <h3>Reskill</h3>
+            <input type="text" class="find" placeholder="Find a skill…" @onchange="OnFind" />
+            @if (_findMiss)
+            {
+                <div class="field-error find-miss">No skill has that name.</div>
+            }
+            <div class="reskill-buttons">
+                <button class="btn danger refund-all" disabled="@s.ReadOnly" @onclick="AskRefund">Refund all</button>
+                <button class="btn undo" disabled="@s.ReadOnly" @onclick="Undo">Undo</button>
+            </div>
+            <p class="muted note">Refund all clears the tree back to the Sparks and returns every point. You then rebuild by clicking nodes.</p>
+        </section>
+
+        @if (_confirmUnlearn is { } c)
+        {
+            <Banner Kind="warn">
+                <div class="confirm-unlearn">
+                    <span>Unlearning <b>@c.Name</b> also unlearns these skills, which depend on it:</span>
+                    <ul class="dependents">
+                        @foreach (var d in c.Dependents)
+                        {
+                            <li>@d</li>
+                        }
+                    </ul>
+                    <button class="btn confirm" @onclick="ConfirmUnlearn">Unlearn all</button>
+                    <button class="btn cancel" @onclick="() => _confirmUnlearn = null">Keep them</button>
+                </div>
+            </Banner>
+        }
+        @if (_confirmRefund)
+        {
+            <Banner Kind="warn">
+                <div class="confirm-refund">
+                    <span>Refund every learned skill and return all the points?</span>
+                    <button class="btn confirm" @onclick="RefundAll">Refund all</button>
+                    <button class="btn cancel" @onclick="() => _confirmRefund = false">Cancel</button>
+                </div>
+            </Banner>
+        }
+        @if (_error is not null)
+        {
+            <Banner Kind="error"><span class="skills-error">@_error</span></Banner>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly TimeSpan MessageTime = TimeSpan.FromSeconds(3);
+
+    private SkillTree? _tree;
+    private uint _hover;
+    private uint _messageNode;
+    private uint? _found;
+    private bool _findMiss;
+    private bool _confirmRefund;
+    private string? _message;
+    private string? _error;
+    private (uint Id, string Name, List<string> Dependents)? _confirmUnlearn;
+    private CancellationTokenSource? _messageTimer;
+
+    protected override void OnInitialized() => EditorService.Changed += OnChanged;
+
+    private Task Zoom(double factor) => _tree?.ZoomByAsync(factor) ?? Task.CompletedTask;
+
+    private Task Fit() => _tree?.FitAsync() ?? Task.CompletedTask;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private static int Rank(SkillNodeView n) => n.Type == SkillNodeType.Spark ? 1 : n.Rank;
+
+    private static string ActionText(SkillNodeView n) => n.Type == SkillNodeType.Spark ? "Always active"
+        : n.State != NodeState.Learned ? "Click to learn"
+        : n.Rank < n.MaxRank ? "Click to rank up" : "Click to unlearn";
+
+    private void OnNodeHovered(uint id) => _hover = id;
+
+    private void OnNodeClicked(uint id)
+    {
+        _error = null;
+        _confirmRefund = false;
+        _confirmUnlearn = null;
+        var nodes = EditorService.Current.Nodes;
+        var node = nodes.FirstOrDefault(n => n.Id == id);
+        if (node is null)
+            return;
+        try
+        {
+            if (node.State == NodeState.Learned && node.Type != SkillNodeType.Spark && node.Rank >= node.MaxRank)
+            {
+                var dependents = EditorService.DependentsOf(id);
+                if (dependents.Count > 0)
+                {
+                    var names = nodes.ToDictionary(n => n.Id, n => n.Name);
+                    _confirmUnlearn = (id, node.Name, dependents.Select(d => names.GetValueOrDefault(d, $"Skill {d:x8}")).ToList());
+                    return;
+                }
+                EditorService.Unlearn(id);
+            }
+            else
+            {
+                EditorService.Learn(id);
+            }
+            _message = null;
+        }
+        catch (EditRejectedException e)
+        {
+            ShowMessage(id, e.Message);
+        }
+    }
+
+    /// <summary>A rejected click is explained in the hover card for three seconds.</summary>
+    private void ShowMessage(uint id, string text)
+    {
+        _messageTimer?.Cancel();
+        _messageTimer?.Dispose();
+        var timer = _messageTimer = new CancellationTokenSource();
+        (_message, _messageNode) = (text, id);
+        _ = Expire(timer);
+    }
+
+    private async Task Expire(CancellationTokenSource timer)
+    {
+        try
+        {
+            await Task.Delay(MessageTime, timer.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        _message = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ConfirmUnlearn()
+    {
+        if (_confirmUnlearn is not { } c)
+            return;
+        _confirmUnlearn = null;
+        Run(() => EditorService.Unlearn(c.Id));
+    }
+
+    private void AskRefund()
+    {
+        _error = null;
+        _confirmUnlearn = null;
+        _confirmRefund = true;
+    }
+
+    private void RefundAll()
+    {
+        _confirmRefund = false;
+        Run(() => EditorService.RefundAll());
+    }
+
+    private void Undo()
+    {
+        _confirmRefund = false;
+        _confirmUnlearn = null;
+        Run(() => EditorService.Undo());
+    }
+
+    private void Run(Action edit)
+    {
+        _error = null;
+        try
+        {
+            edit();
+        }
+        catch (EditRejectedException e)
+        {
+            _error = e.Message;
+        }
+    }
+
+    private async Task OnFind(ChangeEventArgs e)
+    {
+        var text = (e.Value as string)?.Trim() ?? "";
+        _findMiss = false;
+        _found = null;
+        if (text.Length == 0)
+            return;
+        var nodes = EditorService.Current.Nodes;
+        var match = nodes.FirstOrDefault(n => n.Name.StartsWith(text, StringComparison.OrdinalIgnoreCase))
+            ?? nodes.FirstOrDefault(n => n.Name.Contains(text, StringComparison.OrdinalIgnoreCase));
+        if (match is null)
+        {
+            _findMiss = true;
+            return;
+        }
+        _found = match.Id;
+        if (_tree is not null)
+            await _tree.FlyToAsync(match);
+    }
+
+    public void Dispose()
+    {
+        EditorService.Changed -= OnChanged;
+        _messageTimer?.Cancel();
+        _messageTimer?.Dispose();
+    }
+}

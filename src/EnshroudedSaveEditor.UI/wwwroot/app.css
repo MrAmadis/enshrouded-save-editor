@@ -432,3 +432,43 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .tile.sel { border-color: var(--gold); box-shadow: 0 0 12px rgba(216, 191, 134, .25) inset; }
 .adding { border-left: 1px solid var(--line); padding: 14px; overflow: auto; }
 .adding .banner { margin: 0 0 10px; }
+
+/* Skills tab */
+.skills-tab { display: grid; grid-template-columns: 1fr 290px; gap: 14px; }
+.skills-side > * + * { margin-top: 12px; }
+.skills-side .panel { padding: 12px; }
+.tree-panel { position: relative; overflow: hidden; padding: 0; background: radial-gradient(circle at 50% 50%, rgba(216, 191, 134, .10), transparent 35%), radial-gradient(circle at 50% 50%, rgba(178, 58, 92, .10), transparent 70%), var(--panel); }
+.tree-panel svg.tree { width: 100%; height: calc(100vh - 250px); min-height: 420px; display: block; cursor: grab; touch-action: none; }
+.tree-panel svg.tree.drag { cursor: grabbing; }
+.tree .lk, .tree .nd, .tree .selring { vector-effect: non-scaling-stroke; }
+.tree .nd { cursor: pointer; }
+.tree .nd:hover { stroke: #fff; stroke-width: 2.2; }
+.tree .lab { cursor: zoom-in; font-family: Cinzel, serif; font-size: 11px; letter-spacing: .18em; text-anchor: middle; opacity: .85; }
+.tree .lk { stroke: #2a3442; stroke-width: 1.1; }
+.tree .lk.on { stroke: var(--gold); stroke-width: 1.8; filter: drop-shadow(0 0 3px rgba(216, 191, 134, .7)); }
+.tree .nd.locked { fill: #121821; stroke: #33404f; stroke-width: 1; }
+.tree .nd.available { fill: #121821; stroke: var(--c); stroke-width: 1.6; }
+.tree .nd.learned { fill: var(--c); stroke: #fff6dc; stroke-width: .8; filter: drop-shadow(0 0 4px var(--c)); }
+.tree .selring { fill: none; stroke: var(--gold-2); stroke-width: 1.6; stroke-dasharray: 3 2; pointer-events: none; }
+.tree-panel .hint { position: absolute; left: 12px; top: 12px; z-index: 1; color: var(--muted); font-size: 12px; background: rgba(13, 18, 25, .8); padding: 5px 9px; border-radius: 3px; border: 1px solid var(--line); pointer-events: none; }
+.tree-panel .zoom { position: absolute; right: 12px; top: 12px; z-index: 1; display: flex; flex-direction: column; gap: 6px; }
+.tree-panel .zoom button { width: 34px; height: 34px; background: rgba(13, 18, 25, .92); border: 1px solid var(--line-2); color: var(--gold-2); font-size: 17px; border-radius: 3px; cursor: pointer; }
+.tree-panel .zoom button.fit { font-family: Cinzel, serif; font-size: 9px; letter-spacing: .1em; }
+.tree-panel .zoomlvl { text-align: center; color: var(--muted); font-size: 11px; }
+.tree-panel .tip { position: absolute; left: 12px; bottom: 44px; z-index: 2; pointer-events: none; width: 250px; background: rgba(10, 14, 20, .96); border: 1px solid var(--gold); border-radius: 3px; padding: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, .6); }
+.tip .tip-name { font-family: Cinzel, serif; color: var(--gold-2); font-weight: 500; }
+.tip .tip-meta { margin-left: 8px; color: var(--muted); }
+.tip p { margin: 6px 0 0; color: var(--dim); font-size: 12px; line-height: 1.4; }
+.tip .tip-action { color: var(--gold); }
+.tip .tip-message { color: var(--danger); }
+.tree-panel .legend { display: flex; gap: 14px; justify-content: center; color: var(--muted); font-size: 12px; padding: 8px 0 10px; border-top: 1px solid var(--line); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+.legend i.lg-learned { background: #d8bf86; }
+.legend i.lg-next { border: 1.5px solid #86a8ff; }
+.legend i.lg-locked { background: #121821; border: 1px solid #33404f; }
+input.find { width: 100%; background: #0d1219; border: 1px solid var(--line-2); color: var(--text); padding: 8px 10px; border-radius: 3px; font: inherit; margin-bottom: 10px; }
+.reskill-buttons { display: flex; gap: 8px; }
+.reskill-buttons .btn { flex: 1; }
+.skills-side .note { line-height: 1.45; margin: 10px 0 0; }
+.confirm-unlearn ul.dependents { margin: 6px 0; padding-left: 18px; max-height: 160px; overflow: auto; }
+.confirm-unlearn .btn, .confirm-refund .btn { margin-top: 6px; margin-right: 6px; }

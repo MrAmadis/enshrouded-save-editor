@@ -1,0 +1,158 @@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@{
+    Layout();
+    var pos = Nodes.ToDictionary(n => n.Id, n => Place(n.X, n.Y));
+    var learned = Nodes.Where(n => n.State == NodeState.Learned).Select(n => n.Id).ToHashSet();
+}
+<svg class="tree" viewBox="0 0 640 640" preserveAspectRatio="xMidYMid meet" @ref="_svg">
+    @foreach (var (a, b) in Links)
+    {
+        if (!pos.TryGetValue(a, out var pa) || !pos.TryGetValue(b, out var pb))
+        {
+            continue;
+        }
+        <line x1="@F(pa.X)" y1="@F(pa.Y)" x2="@F(pb.X)" y2="@F(pb.Y)" class="lk @(learned.Contains(a) && learned.Contains(b) ? "on" : "")" />
+    }
+    @foreach (var n in Nodes)
+    {
+        var (x, y) = pos[n.Id];
+        var cls = $"nd {StateClass(n.State)}";
+        var style = $"--c:{Colour(n.Class)}";
+        if (n.Type == SkillNodeType.Ability)
+        {
+            <rect x="@F(x - 6.2)" y="@F(y - 6.2)" width="12.4" height="12.4" transform="rotate(45 @F(x) @F(y))" class="@cls" style="@style" data-id="@n.Id" />
+        }
+        else
+        {
+            <circle cx="@F(x)" cy="@F(y)" r="@F(Radius(n.Type))" class="@cls" style="@style" data-id="@n.Id" />
+        }
+    }
+    @if (Selected is { } sel && pos.TryGetValue(sel, out var sp))
+    {
+        <circle cx="@F(sp.X)" cy="@F(sp.Y)" r="11" class="selring" />
+    }
+    @foreach (var l in Labels)
+    {
+        @Label(l)
+    }
+</svg>
+
+@code {
+    private const double View = 640, Pad = 30;
+    private const string ModulePath = "./_content/EnshroudedSaveEditor.UI/skilltree.js";
+
+    [Parameter, EditorRequired] public IReadOnlyList<SkillNodeView> Nodes { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<(uint A, uint B)> Links { get; set; } = [];
+    [Parameter, EditorRequired] public IReadOnlyList<ArchetypeLabel> Labels { get; set; } = [];
+    /// <summary>The node ringed after "Find a skill".</summary>
+    [Parameter] public uint? Selected { get; set; }
+    [Parameter] public EventCallback<uint> OnNodeClicked { get; set; }
+    [Parameter] public EventCallback<uint> OnNodeHovered { get; set; }
+
+    private ElementReference _svg;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<SkillTree>? _self;
+
+    [JSInvokable] public Task NodeClicked(uint id) => OnNodeClicked.InvokeAsync(id);
+    [JSInvokable] public Task NodeHovered(uint id) => OnNodeHovered.InvokeAsync(id);
+
+    public async Task ZoomByAsync(double factor)
+    {
+        if (_module is not null)
+            await _module.InvokeVoidAsync("zoomBy", _svg, factor);
+    }
+
+    public async Task FitAsync()
+    {
+        if (_module is not null)
+            await _module.InvokeVoidAsync("fit", _svg);
+    }
+
+    /// <summary>Glides to the node: tree coordinates in, view units out.</summary>
+    public async Task FlyToAsync(SkillNodeView node)
+    {
+        var (x, y) = Place(node.X, node.Y);
+        if (_module is not null)
+            await _module.InvokeVoidAsync("flyTo", _svg, x, y);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import", ModulePath);
+            _self = DotNetObjectReference.Create(this);
+            await _module.InvokeVoidAsync("attach", _svg, _self);
+        }
+        catch (JSException)
+        {
+            // The tree still renders, just without pan and zoom.
+        }
+    }
+
+    // The mockup generator's layout: the bounding box of nodes and labels, scaled to a 640-unit view with a 30-unit margin.
+    private double _minX, _minY, _scale = 1;
+
+    private void Layout()
+    {
+        if (Nodes.Count == 0)
+            return;
+        var xs = Nodes.Select(n => n.X).Concat(Labels.Select(l => l.X)).ToList();
+        var ys = Nodes.Select(n => n.Y).Concat(Labels.Select(l => l.Y)).ToList();
+        _minX = xs.Min();
+        _minY = ys.Min();
+        _scale = (View - 2 * Pad) / Math.Max(1, Math.Max(xs.Max() - _minX, ys.Max() - _minY));
+    }
+
+    private (double X, double Y) Place(double x, double y) => (Pad + (x - _minX) * _scale, Pad + (y - _minY) * _scale);
+
+    // Razor treats a literal <text> tag as its own directive, so the SVG label is built by hand.
+    private RenderFragment Label(ArchetypeLabel l) => b =>
+    {
+        var (x, y) = Place(l.X, l.Y);
+        b.OpenElement(0, "text");
+        b.AddAttribute(1, "x", F(x));
+        b.AddAttribute(2, "y", F(y));
+        b.AddAttribute(3, "class", "lab");
+        b.AddAttribute(4, "style", $"fill:{Colour(l.Class)}");
+        b.AddContent(5, l.Name);
+        b.CloseElement();
+    };
+
+    private static string F(double v) => v.ToString("0.0", CultureInfo.InvariantCulture);
+
+    private static string Colour(SkillClass c) => c switch
+    {
+        SkillClass.Mage => "#86a8ff", SkillClass.Ranger => "#7fc76a", SkillClass.Warrior => "#e58a5a", _ => "#d8bf86",
+    };
+
+    private static double Radius(SkillNodeType t) => t switch
+    {
+        SkillNodeType.Attribute => 3.4, SkillNodeType.Spark => 4.2, _ => 4.4,
+    };
+
+    private static string StateClass(NodeState s) => s switch
+    {
+        NodeState.Learned => "learned", NodeState.Available => "available", _ => "locked",
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        _self?.Dispose();
+        if (_module is null)
+            return;
+        try
+        {
+            await _module.InvokeVoidAsync("detach", _svg);
+            await _module.DisposeAsync();
+        }
+        catch (Exception e) when (e is JSDisconnectedException or JSException or ObjectDisposedException)
+        {
+        }
+    }
+}
