@@ -67,6 +67,16 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
 
     private SaveSession Session => _session ?? throw new InvalidOperationException("No character is open.");
 
+    /// <summary>Tests only: the open session (e.g. to force a verify failure).</summary>
+    internal SaveSession? OpenSession
+    {
+        get
+        {
+            lock (_lock)
+                return _session;
+        }
+    }
+
     private IGameData Data => game.Data;
 
     private bool IsItem(uint id) => Data.Items.Find(id) is not null;
@@ -184,7 +194,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
 
     /// <summary>
     /// Puts back one of <see cref="Backups"/> (it backs up the current file first), then reopens the character. Refused
-    /// for any other file and while the game runs.
+    /// for any other file, for a backup of another character (its save GUID differs), and while the game runs.
     /// </summary>
     public SessionView Restore(string backupPath)
     {
@@ -200,7 +210,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         {
             _backups.Restore(backup, path);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             throw new EditRejectedException($"Couldn't restore that backup: {e.Message}");
         }

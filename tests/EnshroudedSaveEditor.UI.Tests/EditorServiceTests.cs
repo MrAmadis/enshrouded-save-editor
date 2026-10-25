@@ -263,6 +263,69 @@ public sealed class EditorServiceTests : IDisposable
         Assert.Equal(File.ReadAllBytes(Path.Combine(Fixtures.RealRemote, "character2.ksd")), File.ReadAllBytes(C(2)));
     }
 
+    // Review fix 1: after a failed save, undoing back to the opened state and saving must write that state.
+    [Fact]
+    public void A_failed_verify_then_undo_saves_the_undone_state()
+    {
+        var e = Start();
+        e.Open(C(2));
+        e.SetLevel(10);
+        e.OpenSession!.VerifyOverride = () => false;
+
+        Assert.Equal(SaveResult.VerifyFailed, e.Save());
+        Assert.Equal(["Level 7 → 10"], e.Current.Pending);
+        Assert.Equal(Fixtures.Read("character2.ksd"), File.ReadAllBytes(C(2)));
+
+        e.Undo();
+        e.OpenSession!.VerifyOverride = null;
+        Assert.Equal(SaveResult.Saved, e.Save());
+
+        Assert.Equal(7u, SaveSession.Open(C(2), IsItem).Player.Level);
+        Assert.Equal(7, e.Current.Level);
+        Assert.Equal(7, Start().Open(C(2)).Level);
+    }
+
+    // Review fix 2: the Steam and local folders both hold character0.ksd.
+    [Fact]
+    public void Same_named_characters_in_other_folders_keep_their_own_backups()
+    {
+        var local = Fixtures.CopyLocalToTemp();
+        _extraDirs.Add(local);
+        var options = new EditorOptions([_root, local], _appData, _probe, null);
+        var e = new EditorService(options, new GameDataProvider(ReferenceGameData.Load), new IconService(options.IconCacheRoot));
+        var localC0 = Path.Combine(local, "character0.ksd");
+        e.Open(C(0));
+        e.SetLevel(13);
+        Assert.Equal(SaveResult.Saved, e.Save());
+        var steamBackup = Assert.Single(e.Backups());
+        var localBytes = File.ReadAllBytes(localC0);
+
+        e.Open(localC0);
+
+        Assert.Empty(e.Backups());
+        Assert.Equal("That backup doesn't belong to this character", Rejected(() => e.Restore(steamBackup.Path)).Message);
+        Assert.Equal(localBytes, File.ReadAllBytes(localC0));
+    }
+
+    [Fact]
+    public void Restore_refuses_a_backup_of_another_character()
+    {
+        var e = Start();
+        e.Open(C(2));
+        e.SetLevel(10);
+        e.Save();
+        var backup = Assert.Single(e.Backups());
+        var other = File.ReadAllBytes(C(1));
+        Assert.NotEqual(KsdFile.Parse(other).Guid, KsdFile.Parse(File.ReadAllBytes(backup.Path)).Guid);
+        File.WriteAllBytes(C(2), other);                                    // the file now holds another character
+        e.Reload();
+
+        var ex = Rejected(() => e.Restore(backup.Path));
+
+        Assert.Equal("Couldn't restore that backup: it belongs to a different character (the save GUIDs differ).", ex.Message);
+        Assert.Equal(other, File.ReadAllBytes(C(2)));
+    }
+
     [Fact]
     public void Catalog_excludes_customization_and_has_icons()
     {

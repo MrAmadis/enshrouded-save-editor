@@ -48,6 +48,20 @@ public sealed class KsdFile
 
     public KsdSection? Find(string name) => _sections.Find(s => s.Name == name);
 
+    /// <summary>Everything a save changes: each section's block and checksum, the revision, the timestamp and the GUID.</summary>
+    internal sealed record State((byte[] Block, uint Checksum)[] Sections, uint Revision, DateTimeOffset SavedAt, byte[] Guid);
+
+    internal State Capture() => new(_sections.Select(s => s.State).ToArray(), Revision, SavedAt, _guid.ToArray());
+
+    /// <summary>Puts back a <see cref="Capture"/> of this file.</summary>
+    internal void Restore(State state)
+    {
+        for (var i = 0; i < _sections.Count; i++) _sections[i].State = state.Sections[i];
+        Revision = state.Revision;
+        SavedAt = state.SavedAt;
+        _guid = state.Guid.ToArray();
+    }
+
     public static KsdFile Parse(byte[] file)
     {
         if (file.Length < HeaderSize) throw new KsdFormatException("File is shorter than the 48-byte header.");

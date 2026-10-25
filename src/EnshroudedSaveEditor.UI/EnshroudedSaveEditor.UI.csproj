@@ -14,4 +14,8 @@
     <ProjectReference Include="..\EnshroudedSaveEditor.GameData\EnshroudedSaveEditor.GameData.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EnshroudedSaveEditor.UI.Tests" />
+  </ItemGroup>
+
 </Project>

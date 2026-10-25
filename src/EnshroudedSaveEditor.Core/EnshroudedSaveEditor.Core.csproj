@@ -10,4 +10,9 @@
     <PackageReference Include="ZstdSharp.Port" Version="0.8.6" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EnshroudedSaveEditor.Core.Tests" />
+    <InternalsVisibleTo Include="EnshroudedSaveEditor.UI.Tests" />
+  </ItemGroup>
+
 </Project>

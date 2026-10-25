@@ -186,4 +186,68 @@ public class SaveSessionTests : IDisposable
         Assert.Equal(2, all.Count);
         Assert.Contains(all, x => File.ReadAllBytes(x.Path).AsSpan().SequenceEqual(edited));
     }
+
+    static (List<byte[]> Blocks, uint Revision, DateTimeOffset SavedAt) FileState(SaveSession s) =>
+        (s.File.Sections.Select(x => x.Block.ToArray()).ToList(), s.File.Revision, s.File.SavedAt);
+
+    static void AssertSameState((List<byte[]> Blocks, uint Revision, DateTimeOffset SavedAt) expected, SaveSession s)
+    {
+        var actual = FileState(s);
+        Assert.Equal((expected.Revision, expected.SavedAt), (actual.Revision, actual.SavedAt));
+        Assert.Equal(expected.Blocks.Count, actual.Blocks.Count);
+        for (var i = 0; i < expected.Blocks.Count; i++)
+            Assert.True(expected.Blocks[i].AsSpan().SequenceEqual(actual.Blocks[i]), s.File.Sections[i].Name);
+        Assert.All(s.File.Sections, x => Assert.True(x.ChecksumValid, x.Name));
+    }
+
+    // Review fix 1: a failed save must leave the in-memory container equal to the file on disk, or a later save that
+    // finds the records unchanged would write the failed attempt's sections.
+    [Fact]
+    public void VerifyFailed_leaves_the_container_as_it_was_before_the_save()
+    {
+        var disk = File.ReadAllBytes(P);
+        var s = Open();
+        var before = FileState(s);
+        s.Player.Level = 10; s.MarkChanged();
+        s.VerifyOverride = () => false;
+
+        Assert.Equal(SaveResult.VerifyFailed, s.Save(Backups, new FakeProbe()));
+
+        Assert.Equal(disk, File.ReadAllBytes(P));
+        AssertSameState(before, s);
+        Assert.Equal(1, s.ChangeCount);
+
+        // Undo the edit by hand and save: the file must hold level 7, not the failed attempt's 10.
+        s.VerifyOverride = null;
+        s.Player.Level = 7;
+        Assert.Equal(SaveResult.Saved, s.Save(Backups, new FakeProbe()));
+        var reopened = Open();
+        Assert.Equal(7u, reopened.Player.Level);
+        Assert.Equal(before.Revision + 1, reopened.File.Revision);
+    }
+
+    [Fact]
+    public void A_failed_write_leaves_the_container_as_it_was_before_the_save()
+    {
+        var disk = File.ReadAllBytes(P);
+        var s = Open();
+        var before = FileState(s);
+        s.Player.Level = 10; s.MarkChanged();
+        File.SetAttributes(P, FileAttributes.ReadOnly);
+        try
+        {
+            var e = Record.Exception(() => s.Save(Backups, new FakeProbe()));
+            Assert.True(e is IOException or UnauthorizedAccessException, e?.ToString() ?? "no exception");
+        }
+        finally
+        {
+            File.SetAttributes(P, FileAttributes.Normal);
+        }
+
+        Assert.Equal(disk, File.ReadAllBytes(P));
+        AssertSameState(before, s);
+        Assert.Empty(Directory.GetFiles(_tmp, "*.tmp"));
+        Assert.Equal(SaveResult.Saved, s.Save(Backups, new FakeProbe()));
+        Assert.Equal(10u, Open().Player.Level);
+    }
 }

@@ -34,6 +34,13 @@ public sealed class KsdSection
 
     internal uint StoredChecksum => _storedChecksum;
 
+    /// <summary>The block and stored checksum as they are now; <see cref="SetData"/> replaces the block, never changes it.</summary>
+    internal (byte[] Block, uint Checksum) State
+    {
+        get => (_block, _storedChecksum);
+        set => (_block, _storedChecksum) = value;
+    }
+
     /// <summary>The decompressed data, or the raw body when the section is stored.</summary>
     public byte[] GetData()
     {

@@ -41,6 +41,9 @@ public sealed class SaveSession
 
     public void MarkChanged() => ChangeCount++;
 
+    /// <summary>Tests only: replaces the read-back check of <see cref="Save"/> (e.g. to force a verify failure).</summary>
+    internal Func<bool>? VerifyOverride { get; set; }
+
     /// <summary>The records as they stand now, for <see cref="Restore"/>.</summary>
     public SessionSnapshot Snapshot() => new(Character.ToBytes(), Player.ToBytes(), Knowledge.ToBytes(), ChangeCount);
 
@@ -122,45 +125,58 @@ public sealed class SaveSession
 
         var backup = backups.Backup(Path);
 
-        var newCharacter = Character.ToBytes();
-        var newPlayer = Player.ToBytes();
-        var newKnowledge = _origKnowledge is null ? null : Knowledge.ToBytes();
-        if (!newCharacter.AsSpan().SequenceEqual(_origCharacter)) File[CharacterSection].SetData(newCharacter);
-        if (!newPlayer.AsSpan().SequenceEqual(_origPlayer)) File[PlayerSection].SetData(newPlayer);
-        if (newKnowledge is not null && !newKnowledge.AsSpan().SequenceEqual(_origKnowledge)) File[KnowledgeSection].SetData(newKnowledge);
-
-        File.Revision += 1;
-        File.SavedAt = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-
-        var intended = File.Sections.Select(s => (s.Name, Data: s.GetData())).ToList();
-        var output = File.ToBytes();
-        var tmp = Path + ".tmp";
+        // Every path but Saved puts the container back, so it stays equal to the file on disk (which a failed
+        // verify restores from the backup): a later save then compares the records against what is really there.
+        var before = File.Capture();
+        var saved = false;
         try
         {
-            System.IO.File.WriteAllBytes(tmp, output);
-            System.IO.File.Replace(tmp, Path, null);
+            var newCharacter = Character.ToBytes();
+            var newPlayer = Player.ToBytes();
+            var newKnowledge = _origKnowledge is null ? null : Knowledge.ToBytes();
+            if (!newCharacter.AsSpan().SequenceEqual(_origCharacter)) File[CharacterSection].SetData(newCharacter);
+            if (!newPlayer.AsSpan().SequenceEqual(_origPlayer)) File[PlayerSection].SetData(newPlayer);
+            if (newKnowledge is not null && !newKnowledge.AsSpan().SequenceEqual(_origKnowledge)) File[KnowledgeSection].SetData(newKnowledge);
+
+            File.Revision += 1;
+            File.SavedAt = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+
+            var intended = File.Sections.Select(s => (s.Name, Data: s.GetData())).ToList();
+            var output = File.ToBytes();
+            var tmp = Path + ".tmp";
+            try
+            {
+                System.IO.File.WriteAllBytes(tmp, output);
+                System.IO.File.Replace(tmp, Path, null);
+            }
+            finally
+            {
+                if (System.IO.File.Exists(tmp)) try { System.IO.File.Delete(tmp); } catch (IOException) { }
+            }
+
+            if (!Verify(intended, File.Revision))
+            {
+                System.IO.File.Copy(backup, Path, overwrite: true);
+                return SaveResult.VerifyFailed;
+            }
+
+            _hash = SHA256.HashData(output);
+            _origCharacter = newCharacter;
+            _origPlayer = newPlayer;
+            if (newKnowledge is not null) _origKnowledge = newKnowledge;
+            ChangeCount = 0;
+            saved = true;
+            return SaveResult.Saved;
         }
         finally
         {
-            if (System.IO.File.Exists(tmp)) try { System.IO.File.Delete(tmp); } catch (IOException) { }
+            if (!saved) File.Restore(before);
         }
-
-        if (!Verify(intended, File.Revision))
-        {
-            System.IO.File.Copy(backup, Path, overwrite: true);
-            return SaveResult.VerifyFailed;
-        }
-
-        _hash = SHA256.HashData(output);
-        _origCharacter = newCharacter;
-        _origPlayer = newPlayer;
-        if (newKnowledge is not null) _origKnowledge = newKnowledge;
-        ChangeCount = 0;
-        return SaveResult.Saved;
     }
 
     bool Verify(List<(string Name, byte[] Data)> intended, uint revision)
     {
+        if (VerifyOverride is { } verify) return verify();
         try
         {
             var back = KsdFile.Parse(System.IO.File.ReadAllBytes(Path));
