@@ -3,6 +3,7 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.IO.Hashing;
 using System.Text.Json;
+using EnshroudedSaveEditor.Core.Container;
 
 namespace EnshroudedSaveEditor.Tests;
 
@@ -25,6 +26,21 @@ public static class Fixtures
     }
 
     public static byte[] Read(string fileName) => File.ReadAllBytes(Path.Combine(RealRemote, fileName));
+
+    /// <summary>
+    /// The whole character2.ksd file with its player_character end anchor broken (<c>02 00 03 00 …</c> → <c>09 …</c>),
+    /// as InventoryTests.Unrecognised_tail_falls_back_to_in_place_edits does, so its inventory opens
+    /// <c>InPlaceOnly</c>. Write it to a temp folder to open it as a session.
+    /// </summary>
+    public static byte[] InPlaceOnlyCharacter2()
+    {
+        var file = KsdFile.Parse(Read("character2.ksd"));
+        var section = file["player_character"];
+        var data = section.GetData();
+        data[^22] = 0x09;
+        section.SetData(data);
+        return file.ToBytes();
+    }
 
     static readonly Lazy<IReadOnlySet<uint>> ItemIdSet = new(() => LoadItemIds(ItemDbPath));
 
