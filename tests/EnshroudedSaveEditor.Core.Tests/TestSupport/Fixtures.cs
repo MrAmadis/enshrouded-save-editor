@@ -1,5 +1,8 @@
 using System.Buffers.Binary;
+using System.Collections.Frozen;
+using System.Globalization;
 using System.IO.Hashing;
+using System.Text.Json;
 
 namespace EnshroudedSaveEditor.Tests;
 
@@ -22,6 +25,27 @@ public static class Fixtures
     }
 
     public static byte[] Read(string fileName) => File.ReadAllBytes(Path.Combine(RealRemote, fileName));
+
+    static readonly Lazy<IReadOnlySet<uint>> ItemIdSet = new(() => LoadItemIds(ItemDbPath));
+
+    static string ItemDbPath => Path.Combine(RepoRoot, "tests", "fixtures", "real", "itemdb2.json");
+
+    /// <summary>The item ids (the hex keys of the <c>items</c> object) in the reference itemdb2.json.</summary>
+    public static IReadOnlySet<uint> ItemIds()
+    {
+        if (!File.Exists(ItemDbPath))
+            Assert.Skip($"Reference data missing: {ItemDbPath}");
+        return ItemIdSet.Value;
+    }
+
+    private static IReadOnlySet<uint> LoadItemIds(string path)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+        var ids = new HashSet<uint>();
+        foreach (var item in doc.RootElement.GetProperty("items").EnumerateObject())
+            ids.Add(uint.Parse(item.Name, NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+        return ids.ToFrozenSet();
+    }
 
     /// <summary>
     /// Patches the raw block bytes (header included) of one section, then rewrites that
