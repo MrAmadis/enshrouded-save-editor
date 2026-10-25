@@ -24,8 +24,10 @@ public static class NewItemFields
     /// shields level, durability and rarity (<c>0x13</c>, as every shield seen has durability), weapons level,
     /// durability, rarity and a gem socket (<c>0x33</c>), and everything else no fields.
     /// <para>
-    /// Where the field set has them: level is <paramref name="level"/>, or else the character's level clamped to
-    /// the item's reference range, or no level at all when that range is 0–0 (T10-R1); rarity is <paramref name="rarity"/>, or else the base rarity, with the extra byte 0;
+    /// Where the field set has them: level is <paramref name="level"/>, or else (T10-R1b) the same-id record's own
+    /// level, or else the character's level clamped to the item's reference range (0 for a 0–0 range), capped at
+    /// <see cref="InventoryLayout.MaxItemLevel"/>; a default never changes the field set. Rarity is
+    /// <paramref name="rarity"/>, or else the base rarity, with the extra byte 0;
     /// durability is full, at the copied record's maximum, or for the defaults that of the first weapon record in
     /// <paramref name="pc"/> (needs <paramref name="items"/>), or else 100; the gem socket is empty. A level or
     /// rarity the field set has no room for is not added: the caller checks the returned record.
@@ -41,7 +43,8 @@ public static class NewItemFields
         if (level is < 0 or > byte.MaxValue) throw new ArgumentOutOfRangeException(nameof(level));
 
         var records = pc.Containers.SelectMany(c => c.Records).Where(r => !r.IsGhost).ToList();
-        var template = records.FirstOrDefault(r => r.ItemId == info.Id)
+        var sameId = records.FirstOrDefault(r => r.ItemId == info.Id);
+        var template = sameId
             ?? (info.MaxStack == 1 && items is not null
                 ? records.FirstOrDefault(r => items.Find(r.ItemId) is { MaxStack: 1 } other
                     && other.Category == info.Category && other.Slot == info.Slot && other.WeaponType == info.WeaponType)
@@ -64,7 +67,7 @@ public static class NewItemFields
                 && items?.Find(r.ItemId)?.Category == ItemCategory.Weapons)?.Durability?.Max ?? 100;
         }
 
-        if ((flags & LevelBit) != 0) rec.Level = level is { } l ? (byte)l : DefaultLevel(info, pc.Level);
+        if ((flags & LevelBit) != 0) rec.Level = level is { } l ? (byte)l : DefaultLevel(info, pc.Level, sameId?.Level);
         if ((flags & DurabilityBit) != 0) rec.Durability = (durability, durability);
         if ((flags & RarityBit) != 0) rec.Rarity = ((byte)(rarity ?? info.BaseRarity), 0);
         if ((flags & GemBit) != 0) rec.Gem = (0, 0);
@@ -82,14 +85,23 @@ public static class NewItemFields
     };
 
     /// <summary>
-    /// T10-R1: the character's level clamped to the item's reference range, or no level (no field) when the item
-    /// has no level range (max level 0). The range is used only here, not to bound edits.
+    /// T10-R1b, for a field set that has a level: the same-id record's own level, or else the character's level
+    /// clamped to the item's reference range (0 for a 0–0 range); capped at <see cref="InventoryLayout.MaxItemLevel"/>.
+    /// The reference range is used only here, not to bound edits.
     /// </summary>
-    static byte? DefaultLevel(ItemInfo info, uint characterLevel)
+    static byte DefaultLevel(ItemInfo info, uint characterLevel, byte? sameIdLevel)
     {
-        if (info.MaxLevel <= 0) return null;
-        var max = Math.Min(info.MaxLevel, byte.MaxValue);
-        var min = Math.Clamp(info.MinLevel, 0, max);
-        return (byte)Math.Clamp(characterLevel, (uint)min, (uint)max);
+        int value;
+        if (sameIdLevel is { } own)
+        {
+            value = own;
+        }
+        else
+        {
+            var max = Math.Clamp(info.MaxLevel, 0, byte.MaxValue);
+            var min = Math.Clamp(info.MinLevel, 0, max);
+            value = (int)Math.Clamp(characterLevel, (uint)min, (uint)max);
+        }
+        return (byte)Math.Min(value, InventoryLayout.MaxItemLevel);
     }
 }

@@ -24,6 +24,7 @@ public class InventoryEditorTests : IDisposable
     const uint WaxTorch = 0xe9430638;           // Weapons/Weapon/OneHandWeapon, levels 3–3
     const uint WaterPouch = 0xe4831ad8;         // character2 Inventory 28, flags 04 (bit-2 bytes); levels 0–0
     const uint AdventurerHelmet = 0xff1b25e5;   // Equipment/Helmet, levels 10–10
+    const uint ThreadbarePants = 0xecc1c60c;    // Equipment/Legs, levels 0–0 (the only such gear)
     const uint ScorchingWand = 0xe589d7a4;      // character2 Inventory 16, flags 33, durability 352/363
 
     const string NeedsFull = "Adding and moving items isn't available for this character yet";
@@ -477,15 +478,24 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(0x04, pouch.Flags);
         Assert.Equal(inv.Single(r => r.ItemId == WaterPouch).Bit2, pouch.Bit2);
 
-        // T10-R1: character1's first Water Pouch has a level field (flags 05, level 0), but the item has no level
-        // range (0–0), so a new one gets no level by default; an explicit level still sets it.
+        // T10-R1b: character1's first Water Pouch has a level field (flags 05, level 0). The default never changes
+        // the field set, and takes the same-id record's own level; an explicit level still sets it.
         var pc1 = Open("character1.ksd").Player;
         var template1 = Records(pc1, ContainerKind.Inventory).First(r => r.ItemId == WaterPouch);
         Assert.Equal(0x05, template1.Flags);
         var pouch1 = NewItemFields.Create(Item(WaterPouch), 0, 1, null, null, pc1, _items);
-        Assert.Equal(0x04, pouch1.Flags);
+        Assert.Equal(0x05, pouch1.Flags);
+        Assert.Equal((byte)0, pouch1.Level);
         Assert.Equal(template1.Bit2, pouch1.Bit2);
         Assert.Equal((byte)3, NewItemFields.Create(Item(WaterPouch), 0, 1, 3, null, pc1, _items).Level);
+
+        // T10-R1b: with no level given, a same-id record's own level (the Scorching Wand's 11, not the character's
+        // 7), capped at MaxItemLevel.
+        var wandTemplate = inv.Single(r => r.ItemId == ScorchingWand);
+        Assert.Equal((byte)11, NewItemFields.Create(Item(ScorchingWand), 0, 1, null, null, pc, _items).Level);
+        wandTemplate.Level = 60;
+        Assert.Equal((byte)InventoryLayout.MaxItemLevel, NewItemFields.Create(Item(ScorchingWand), 0, 1, null, null, pc, _items).Level);
+        wandTemplate.Level = 11;
 
         // Same id: full durability and an empty socket, whatever the template holds.
         inv.Single(r => r.ItemId == ScorchingWand).Gem = (0x12345678, 1);
@@ -495,6 +505,32 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal((363u, 363u), wand.Durability);
         Assert.Equal(((byte)Rarity.Rare, (byte)0), wand.Rarity);
         Assert.Equal((0u, (byte)0), wand.Gem);
+    }
+
+    // T10-R1b: the default level never changes the field set; a 0–0 range gives level 0.
+    [Fact]
+    public void Gear_with_a_0_to_0_level_range_keeps_its_level_field()
+    {
+        var s = Open(); var e = Ed(s);
+        Assert.Equal((0, 0), (Item(ThreadbarePants).MinLevel, Item(ThreadbarePants).MaxLevel));
+
+        // Copied from the Alchemist Apprentice Trousers (same category and slot, flags 11).
+        var pants = NewItemFields.Create(Item(ThreadbarePants), 0, 1, null, null, s.Player, _items);
+        Assert.Equal(0x11, pants.Flags);
+        Assert.Equal((byte)0, pants.Level);
+
+        // Through Add, and read back.
+        var at = e.Add(Item(ThreadbarePants), 1, null, null, null);
+        var added = Records(Reparsed(s), ContainerKind.Inventory).Single(r => r.Slot == at.Slot);
+        Assert.Equal(0x01, added.Flags & 0x01);
+        Assert.Equal((byte)0, added.Level);
+
+        // The armour default (no record to copy from) keeps its level field too.
+        var bare = Open().Player;
+        foreach (var c in bare.Containers) c.Records.Clear();
+        var fresh = NewItemFields.Create(Item(ThreadbarePants), 0, 1, null, null, bare, _items);
+        Assert.Equal(0x11, fresh.Flags);
+        Assert.Equal((byte)0, fresh.Level);
     }
 
     [Fact]
