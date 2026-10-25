@@ -39,6 +39,19 @@ function animateTo(svg, target) {
     requestAnimationFrame(step);
 }
 
+// The hover card follows the cursor (mockup rule: +16/+12, flipped left by 270 when it would pass the right edge).
+// Positions go into CSS variables on the panel; --px/--py keep where the last click landed for the rejection message.
+function place(svg, e, prefix) {
+    const panel = svg.closest(".tree-panel");
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    let left = e.clientX - r.left + 16;
+    const top = e.clientY - r.top + 12;
+    if (left + 240 > r.width) left -= 270;
+    panel.style.setProperty(`--${prefix}x`, left + "px");
+    panel.style.setProperty(`--${prefix}y`, top + "px");
+}
+
 export function zoomBy(svg, factor) {
     const vb = state(svg).vb;
     zoomAt(svg, vb.x + vb.w / 2, vb.y + vb.h / 2, factor);
@@ -82,6 +95,7 @@ export function attach(svg, dotnetRef) {
         if (st.drag && !st.moved) {
             const el = document.elementFromPoint(e.clientX, e.clientY);
             const id = nodeId(el);
+            if (id) place(svg, e, "p");
             if (id) dotnetRef.invokeMethodAsync("NodeClicked", id);
             else if (el && el.classList.contains("lab")) flyTo(svg, +el.getAttribute("x"), +el.getAttribute("y"));
         }
@@ -89,7 +103,7 @@ export function attach(svg, dotnetRef) {
     });
     on("pointercancel", () => { st.drag = null; svg.classList.remove("drag"); });
 
-    const over = e => { if (!st.drag) hover(nodeId(e.target)); };
+    const over = e => { if (!st.drag) { hover(nodeId(e.target)); place(svg, e, "t"); } };
     on("mouseover", over);
     on("mousemove", over);
     on("mouseout", e => { if (nodeId(e.target)) hover(0); });

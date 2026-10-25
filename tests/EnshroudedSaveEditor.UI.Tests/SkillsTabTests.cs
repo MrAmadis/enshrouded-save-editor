@@ -146,6 +146,7 @@ public sealed class SkillsTabTests : IDisposable
         await Click(cut, node.Id);   // must not throw
 
         Assert.Equal("Connect it to a learned skill first", cut.Find(".tip .tip-message").TextContent.Trim());
+        Assert.Contains("pinned", cut.Find(".tip").ClassList);   // anchored where the node was clicked
         Assert.Equal("69", Value(cut, "Available"));
         Assert.Empty(editor.Current.Pending);
     }
@@ -163,6 +164,9 @@ public sealed class SkillsTabTests : IDisposable
         Assert.Equal(node.Name, cut.Find(".tip .tip-name").TextContent.Trim());
         Assert.Equal($"rank 0/{node.MaxRank} · cost {node.Cost}", cut.Find(".tip .tip-meta").TextContent.Trim());
         Assert.Equal("Click to learn", cut.Find(".tip .tip-action").TextContent.Trim());
+
+        Assert.Null(cut.Find(".tip").GetAttribute("style"));   // positioned by the script through CSS variables, not pinned inline
+        Assert.DoesNotContain("pinned", cut.Find(".tip").ClassList);
 
         await cut.InvokeAsync(() => cut.FindComponent<SkillTree>().Instance.NodeHovered(0));
         Assert.Empty(cut.FindAll(".tip"));

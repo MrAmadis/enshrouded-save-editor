@@ -455,7 +455,7 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .tree-panel .zoom button { width: 34px; height: 34px; background: rgba(13, 18, 25, .92); border: 1px solid var(--line-2); color: var(--gold-2); font-size: 17px; border-radius: 3px; cursor: pointer; }
 .tree-panel .zoom button.fit { font-family: Cinzel, serif; font-size: 9px; letter-spacing: .1em; }
 .tree-panel .zoomlvl { text-align: center; color: var(--muted); font-size: 11px; }
-.tree-panel .tip { position: absolute; left: 12px; bottom: 44px; z-index: 2; pointer-events: none; width: 250px; background: rgba(10, 14, 20, .96); border: 1px solid var(--gold); border-radius: 3px; padding: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, .6); }
+.tree-panel .tip { position: absolute; left: var(--tx, 12px); top: var(--ty, 12px); z-index: 2; pointer-events: none; width: 250px; background: rgba(10, 14, 20, .96); border: 1px solid var(--gold); border-radius: 3px; padding: 10px; box-shadow: 0 6px 24px rgba(0, 0, 0, .6); }
 .tip .tip-name { font-family: Cinzel, serif; color: var(--gold-2); font-weight: 500; }
 .tip .tip-meta { margin-left: 8px; color: var(--muted); }
 .tip p { margin: 6px 0 0; color: var(--dim); font-size: 12px; line-height: 1.4; }
@@ -472,3 +472,4 @@ input.find { width: 100%; background: #0d1219; border: 1px solid var(--line-2); 
 .skills-side .note { line-height: 1.45; margin: 10px 0 0; }
 .confirm-unlearn ul.dependents { margin: 6px 0; padding-left: 18px; max-height: 160px; overflow: auto; }
 .confirm-unlearn .btn, .confirm-refund .btn { margin-top: 6px; margin-right: 6px; }
+.tree-panel .tip.pinned { left: var(--px, 12px); top: var(--py, 12px); }

@@ -18,7 +18,7 @@
         </div>
         @if (_message is not null || shown is not null)
         {
-            <div class="tip">
+            <div class="tip @(_message is not null ? "pinned" : "")">
                 @if (shown is not null)
                 {
                     <b class="tip-name">@shown.Name</b>
