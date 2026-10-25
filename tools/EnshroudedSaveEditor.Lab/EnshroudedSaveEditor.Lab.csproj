@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EnshroudedSaveEditor.Core\EnshroudedSaveEditor.Core.csproj" />
+    <ProjectReference Include="..\..\src\EnshroudedSaveEditor.GameData\EnshroudedSaveEditor.GameData.csproj" />
   </ItemGroup>
 
 </Project>

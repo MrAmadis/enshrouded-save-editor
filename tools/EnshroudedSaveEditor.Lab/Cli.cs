@@ -13,15 +13,16 @@ public static class Cli
           diff --a <ksd> --b <ksd>
           watch --remote <dir> --out <dir>
           list-copies
+          make-experiments --remote <dir> [--registry <path>] [--backups <dir>]
         """;
 
-    public static int Run(string[] args, TextWriter o, TextWriter err, string? registryPath = null)
+    public static int Run(string[] args, TextWriter o, TextWriter err, string? registryPath = null, IProcessProbe? probe = null)
     {
         try
         {
             if (args.Length == 0) { err.WriteLine(Usage); return 2; }
             var opts = Parse(args.Skip(1).ToArray());
-            var reg = new LabCopyRegistry(registryPath ?? LabCopyRegistry.DefaultPath);
+            var reg = new LabCopyRegistry(registryPath ?? opts.GetValueOrDefault("registry") ?? LabCopyRegistry.DefaultPath);
             switch (args[0])
             {
                 case "copy":
@@ -32,6 +33,11 @@ public static class Cli
                 case "dump": Dump(Req(opts, "file"), opts.GetValueOrDefault("section"), o); return 0;
                 case "diff": Diff(Req(opts, "a"), Req(opts, "b"), o); return 0;
                 case "watch": Watch(reg, Req(opts, "out"), o); return 0;
+                case "make-experiments":
+                    Experiments.Run(Req(opts, "remote"), reg,
+                        new BackupService(opts.GetValueOrDefault("backups") ?? BackupService.DefaultRoot),
+                        probe ?? new ProcessProbe(), o);
+                    return 0;
                 case "list-copies":
                     foreach (var e in reg.List())
                         o.WriteLine($"{e.Path}  {e.Guid}  {(reg.IsWritableCopy(e.Path) ? "writable" : "NOT writable")}");
