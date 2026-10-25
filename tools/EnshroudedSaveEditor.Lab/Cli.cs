@@ -13,7 +13,7 @@ public static class Cli
           diff --a <ksd> --b <ksd>
           watch --remote <dir> --out <dir>
           list-copies
-          make-experiments --remote <dir> [--registry <path>] [--backups <dir>]
+          make-experiments (--remote <dir> | --source <dir> --target <dir>) [--registry <path>] [--backups <dir>]
         """;
 
     public static int Run(string[] args, TextWriter o, TextWriter err, string? registryPath = null, IProcessProbe? probe = null)
@@ -34,7 +34,10 @@ public static class Cli
                 case "diff": Diff(Req(opts, "a"), Req(opts, "b"), o); return 0;
                 case "watch": Watch(reg, Req(opts, "out"), o); return 0;
                 case "make-experiments":
-                    Experiments.Run(Req(opts, "remote"), reg,
+                    var remote = opts.GetValueOrDefault("remote");
+                    var source = opts.GetValueOrDefault("source") ?? remote ?? throw new ArgumentException("Missing --source (or --remote).");
+                    var target = opts.GetValueOrDefault("target") ?? remote ?? throw new ArgumentException("Missing --target (or --remote).");
+                    Experiments.Run(source, target, reg,
                         new BackupService(opts.GetValueOrDefault("backups") ?? BackupService.DefaultRoot),
                         probe ?? new ProcessProbe(), o);
                     return 0;

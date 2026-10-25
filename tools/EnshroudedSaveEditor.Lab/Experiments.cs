@@ -32,7 +32,11 @@ public static partial class Experiments
 
     sealed record Made(string Name, string Path, string Purpose, List<string> Edits);
 
-    public static void Run(string remote, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, TextWriter o)
+    public static void Run(string remote, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, TextWriter o) =>
+        Run(remote, remote, reg, backups, probe, o);
+
+    /// <summary>Reads the sources from <paramref name="source"/> and creates the copies in <paramref name="target"/>.</summary>
+    public static void Run(string source, string target, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, TextWriter o)
     {
         if (probe.IsGameRunning())
             throw new InvalidOperationException("Enshrouded is running. Close the game before making experiment copies.");
@@ -42,19 +46,29 @@ public static partial class Experiments
         if (clash.Count > 0)
             throw new InvalidOperationException("Experiment copies already exist: " + string.Join(", ", clash.Select(n => $"\"{n}\"")));
 
+        var separate = !SamePath(source, target);
+        byte[]? tag = null;
+        if (separate)
+        {
+            tag = GameMadeTag(target, reg)
+                ?? throw new InvalidOperationException("Create one local character in the game first, so the editor can copy its storage tag.");
+            o.WriteLine($"Storage tag for the copies (from the game-made character in the target): {Convert.ToHexString(tag)}");
+        }
+
         var data = ReferenceGameData.Load();
-        var before = HashOriginals(remote);
+        var before = HashOriginals(source, target, separate);
+        var c = new Ctx(source, target, tag);
         var made = new List<Made>
         {
-            Plain(remote, reg),
-            Repack(remote, reg, backups, probe, data),
-            Slots(remote, reg, backups, probe, data),
-            Items(remote, reg, backups, probe, data),
-            Skills(remote, reg, backups, probe, data),
-            Overspend(remote, reg, backups, probe, data),
+            Plain(c, reg),
+            Repack(c, reg, backups, probe, data),
+            Slots(c, reg, backups, probe, data),
+            Items(c, reg, backups, probe, data),
+            Skills(c, reg, backups, probe, data),
+            Overspend(c, reg, backups, probe, data),
         };
 
-        var after = HashOriginals(remote);
+        var after = HashOriginals(source, target, separate);
         o.WriteLine("Original character files (SHA-256, first 16 hex), before -> after:");
         var changed = new List<string>();
         foreach (var (file, h) in before)
@@ -94,29 +108,59 @@ public static partial class Experiments
         return names;
     }
 
-    static SortedDictionary<string, string> HashOriginals(string remote)
+    sealed record Ctx(string Source, string Target, byte[]? Tag);
+
+    static bool SamePath(string a, string b) =>
+        string.Equals(System.IO.Path.GetFullPath(a).TrimEnd('\\', '/'), System.IO.Path.GetFullPath(b).TrimEnd('\\', '/'),
+            StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Storage tag of the lowest-numbered characterN.ksd in the folder that is not a registered Lab copy.</summary>
+    static byte[]? GameMadeTag(string dir, LabCopyRegistry reg)
+    {
+        var copies = reg.List().Select(e => e.Path).ToList();
+        var files = Directory.EnumerateFiles(dir, "*.ksd")
+            .Select(f => (Path: f, M: CharacterNumber().Match(System.IO.Path.GetFileName(f))))
+            .Where(x => x.M.Success && !copies.Any(p => SamePath(p, x.Path)))
+            .OrderBy(x => int.Parse(x.M.Groups[1].Value));
+        foreach (var (path, _) in files)
+        {
+            try
+            {
+                var f = KsdFile.Parse(File.ReadAllBytes(path));
+                if (f.Find("character_data") is { } s) return CharacterData.Parse(s.GetData()).StorageTag;
+            }
+            catch (Exception ex) when (ex is KsdFormatException or IOException) { }
+        }
+        return null;
+    }
+
+    [GeneratedRegex(@"^character(\d+)\.ksd$", RegexOptions.IgnoreCase)]
+    private static partial Regex CharacterNumber();
+
+    static SortedDictionary<string, string> HashOriginals(string source, string target, bool both)
     {
         var d = new SortedDictionary<string, string>(StringComparer.Ordinal);
-        foreach (var f in Directory.EnumerateFiles(remote, "*.ksd"))
-        {
-            var name = System.IO.Path.GetFileName(f);
-            if (CharacterFile().IsMatch(name)) d[name] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(f)))[..16];
-        }
+        foreach (var dir in both ? new[] { source, target } : new[] { source })
+            foreach (var f in Directory.EnumerateFiles(dir, "*.ksd"))
+            {
+                var name = System.IO.Path.GetFileName(f);
+                if (CharacterFile().IsMatch(name)) d[f] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(f)))[..16];
+            }
         return d;
     }
 
     // ---- builders -------------------------------------------------------------------------------
 
-    static Made Plain(string remote, LabCopyRegistry reg)
+    static Made Plain(Ctx c, LabCopyRegistry reg)
     {
-        var path = CharacterCopier.Copy(remote, "character2.ksd", PlainName, reg);
+        var path = CharacterCopier.CopyTo(System.IO.Path.Combine(c.Source, "character2.ksd"), c.Target, PlainName, reg, c.Tag);
         return new Made(PlainName, path, "identity only: listed? loads? same gear/skills/level 7? rank-0 skills shown learned?",
             ["identity only (new GUID, slot, name); no other change"]);
     }
 
-    static Made Repack(string remote, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
+    static Made Repack(Ctx c, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
     {
-        var path = CharacterCopier.Copy(remote, "character2.ksd", RepackName, reg);
+        var path = CharacterCopier.CopyTo(System.IO.Path.Combine(c.Source, "character2.ksd"), c.Target, RepackName, reg, c.Tag);
         var s = Open(path, reg, data);
         foreach (var sec in s.File.Sections) sec.SetData(sec.GetData());
         s.Player.Level = 9; s.Player.Xp = 0;
@@ -126,9 +170,9 @@ public static partial class Experiments
             [$"every section recompressed by our writer ({s.File.Sections.Count} sections)", "level 9, XP 0"]);
     }
 
-    static Made Slots(string remote, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
+    static Made Slots(Ctx c, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
     {
-        var path = CharacterCopier.Copy(remote, "character2.ksd", SlotsName, reg);
+        var path = CharacterCopier.CopyTo(System.IO.Path.Combine(c.Source, "character2.ksd"), c.Target, SlotsName, reg, c.Tag);
         var s = Open(path, reg, data);
         var inv = s.Player.Container(ContainerKind.Inventory)!.Records;
         var extra = s.Player.Container(ContainerKind.Extra)!.Records;
@@ -145,9 +189,9 @@ public static partial class Experiments
         ]);
     }
 
-    static Made Items(string remote, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
+    static Made Items(Ctx c, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
     {
-        var path = CharacterCopier.Copy(remote, "character2.ksd", ItemsName, reg);
+        var path = CharacterCopier.CopyTo(System.IO.Path.Combine(c.Source, "character2.ksd"), c.Target, ItemsName, reg, c.Tag);
         var s = Open(path, reg, data);
         var ed = new InventoryEditor(s, data.Items);
         var edits = new List<string>();
@@ -197,9 +241,9 @@ public static partial class Experiments
             edits);
     }
 
-    static Made Skills(string remote, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
+    static Made Skills(Ctx c, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
     {
-        var path = CharacterCopier.Copy(remote, "character1.ksd", SkillsName, reg);
+        var path = CharacterCopier.CopyTo(System.IO.Path.Combine(c.Source, "character1.ksd"), c.Target, SkillsName, reg, c.Tag);
         var s = Open(path, reg, data);
         var ed = new SkillsEditor(s, data.Tree, data.Rewards);
         var edits = new List<string> { $"points available before: {ed.Points().Available}" };
@@ -242,9 +286,9 @@ public static partial class Experiments
             edits);
     }
 
-    static Made Overspend(string remote, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
+    static Made Overspend(Ctx c, LabCopyRegistry reg, BackupService backups, IProcessProbe probe, ReferenceGameData data)
     {
-        var path = CharacterCopier.Copy(remote, "character2.ksd", OverspendName, reg);
+        var path = CharacterCopier.CopyTo(System.IO.Path.Combine(c.Source, "character2.ksd"), c.Target, OverspendName, reg, c.Tag);
         var s = Open(path, reg, data);
         var n = 0;
         for (var i = 0; i < s.Player.Skills.Count; i++)

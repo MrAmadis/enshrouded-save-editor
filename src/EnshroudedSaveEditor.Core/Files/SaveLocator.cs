@@ -56,6 +56,13 @@ public sealed partial class SaveLocator
                 var sg = System.IO.Path.Combine(profile, "Saved Games", "Enshrouded");
                 if (Directory.Exists(sg) && Directory.EnumerateFiles(sg, "character*.ksd").Any())
                     roots.Add(sg);
+
+                // Local (non-Steam) characters: Saved Games\keen games\Enshrouded\<profile>, e.g. "default".
+                var keen = System.IO.Path.Combine(profile, "Saved Games", "keen games", "Enshrouded");
+                if (Directory.Exists(keen))
+                    foreach (var d in Directory.EnumerateDirectories(keen))
+                        if (Directory.EnumerateFiles(d, "character*.ksd").Any())
+                            roots.Add(d);
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }

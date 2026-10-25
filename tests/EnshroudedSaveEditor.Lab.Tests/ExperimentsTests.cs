@@ -130,4 +130,45 @@ public class ExperimentsTests : IDisposable
         Assert.Equal(before, Hashes());
         Assert.Equal(6, reg.List().Count);
     }
+
+    [Fact]
+    public void Experiments_build_into_a_separate_target()
+    {
+        var local = Fixtures.CopyLocalToTemp();
+        try
+        {
+            var srcBefore = Hashes();
+            var localBefore = File.ReadAllBytes(Path.Combine(local, "character0.ksd"));
+            Experiments.Run(tmp, local, reg, backups, new FakeProbe(false), new StringWriter());
+
+            Assert.Equal(srcBefore, Hashes());
+            Assert.Equal(localBefore, File.ReadAllBytes(Path.Combine(local, "character0.ksd")));
+            for (var n = 1; n <= 6; n++)
+            {
+                var path = Path.Combine(local, $"character{n}.ksd");
+                Assert.True(File.Exists(path), path);
+                var cd = Load(path).Cd;
+                Assert.Equal(n, cd.SlotIndex);
+                Assert.Equal(new byte[] { 0xa8, 0x23, 0xb2, 0x28 }, cd.StorageTag);
+            }
+            Assert.False(File.Exists(Path.Combine(local, "character7.ksd")));
+            Assert.Equal(6, reg.List().Count);
+        }
+        finally { try { Directory.Delete(local, true); } catch { } }
+    }
+
+    [Fact]
+    public void Experiments_refuse_a_target_without_a_game_made_character()
+    {
+        var empty = Path.Combine(Path.GetTempPath(), "lab-empty-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(empty);
+        try
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() =>
+                Experiments.Run(tmp, empty, reg, backups, new FakeProbe(false), new StringWriter()));
+            Assert.Contains("Create one local character in the game first", ex.Message);
+            Assert.Empty(Directory.GetFiles(empty));
+        }
+        finally { try { Directory.Delete(empty, true); } catch { } }
+    }
 }

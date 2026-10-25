@@ -14,11 +14,20 @@ public static partial class CharacterCopier
     public static string Copy(string remoteDir, string fromFile, string newName, LabCopyRegistry registry)
     {
         var sourcePath = Path.IsPathRooted(fromFile) ? fromFile : Path.Combine(remoteDir, fromFile);
+        return CopyTo(sourcePath, remoteDir, newName, registry);
+    }
+
+    /// <summary>
+    /// Reads <paramref name="sourcePath"/> (read-only) and writes it as the next free character{N}.ksd in
+    /// <paramref name="targetDir"/> with a new GUID, slot N and the given name; optionally overrides the storage tag.
+    /// </summary>
+    public static string CopyTo(string sourcePath, string targetDir, string newName, LabCopyRegistry registry, byte[]? storageTag = null)
+    {
         var file = KsdFile.Parse(File.ReadAllBytes(sourcePath));
 
         var guid = RandomNumberGenerator.GetBytes(16);
         var max = -1;
-        foreach (var f in Directory.EnumerateFiles(remoteDir, "*.ksd"))
+        foreach (var f in Directory.EnumerateFiles(targetDir, "*.ksd"))
         {
             var m = CharacterFile().Match(Path.GetFileName(f));
             if (m.Success && int.TryParse(m.Groups[1].ValueSpan, out var n) && n > max) max = n;
@@ -26,12 +35,12 @@ public static partial class CharacterCopier
 
         for (var n = max + 1; n <= 255; n++)
         {
-            var cd = CharacterData.Parse(file["character_data"].GetData()).With(name: newName, slotIndex: (byte)n, guid: guid);
+            var cd = CharacterData.Parse(file["character_data"].GetData()).With(name: newName, slotIndex: (byte)n, guid: guid, storageTag: storageTag);
             file["character_data"].SetData(cd.ToBytes());
             file.Guid = guid;
             var bytes = file.ToBytes();
 
-            var target = Path.Combine(remoteDir, $"character{n}.ksd");
+            var target = Path.Combine(targetDir, $"character{n}.ksd");
             try
             {
                 using (var fs = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))

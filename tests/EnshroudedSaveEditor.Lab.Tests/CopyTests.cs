@@ -111,8 +111,40 @@ public class CopyTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => new CopyWatcher(reg, Path.Combine(tmp, "a", "b")));
         var steam = Path.Combine(Path.GetTempPath(), "x-" + Guid.NewGuid().ToString("N"), "userdata", "1", "1203620", "remote", "backup");
         Assert.Throws<InvalidOperationException>(() => new CopyWatcher(reg, steam));
+        var local = Path.Combine(Path.GetTempPath(), "x-" + Guid.NewGuid().ToString("N"), "Saved Games", "keen games", "Enshrouded", "default", "backup");
+        Assert.Throws<InvalidOperationException>(() => new CopyWatcher(reg, local));
         var ok = Path.Combine(Path.GetTempPath(), "lab-ok-" + Guid.NewGuid().ToString("N"));
         _ = new CopyWatcher(reg, ok);
         Assert.False(Directory.Exists(ok));
+    }
+
+    [Fact]
+    public void Copy_to_target_folder_uses_next_local_number_and_tag()
+    {
+        var local = Fixtures.CopyLocalToTemp();
+        try
+        {
+            var srcFile = Path.Combine(tmp, "character2.ksd");
+            var localFile = Path.Combine(local, "character0.ksd");
+            var srcBefore = File.ReadAllBytes(srcFile);
+            var localBefore = File.ReadAllBytes(localFile);
+            var tag = CharacterData.Parse(KsdFile.Parse(localBefore)["character_data"].GetData()).StorageTag;
+
+            var path = CharacterCopier.CopyTo(srcFile, local, "Test Plain", reg, tag);
+
+            Assert.Equal(Path.Combine(local, "character1.ksd"), path);
+            var f = KsdFile.Parse(File.ReadAllBytes(path));
+            var cd = CharacterData.Parse(f["character_data"].GetData());
+            Assert.Equal(1, cd.SlotIndex);
+            Assert.Equal("Test Plain", cd.Name);
+            Assert.Equal(new byte[] { 0xa8, 0x23, 0xb2, 0x28 }, cd.StorageTag);
+            Assert.Equal(f.Guid, cd.Guid);
+            Assert.NotEqual(KsdFile.Parse(srcBefore).Guid, f.Guid);
+            Assert.NotEqual(KsdFile.Parse(localBefore).Guid, f.Guid);
+            Assert.True(reg.IsWritableCopy(path));
+            Assert.Equal(srcBefore, File.ReadAllBytes(srcFile));
+            Assert.Equal(localBefore, File.ReadAllBytes(localFile));
+        }
+        finally { try { Directory.Delete(local, true); } catch { } }
     }
 }

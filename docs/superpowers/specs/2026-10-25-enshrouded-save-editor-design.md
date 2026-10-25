@@ -57,6 +57,7 @@ A save editor for **Enshrouded 1.0** that lets the owner change their character'
 - **Stack: .NET with a Blazor Hybrid UI, like the Stoneshard project** (owner).
 - **Machine:** Windows 11 (ships WebView2). Installed: .NET SDK 8.0.302 and 10.0.401. Stoneshard pins 10.0.401 in `global.json`.
 - **Saves:** Steam Cloud is **on** for Enshrouded, so saves live in `C:\Program Files (x86)\Steam\userdata\43900557\1203620\remote\`. Find them by scanning `Steam\userdata\*\1203620\remote`; with several accounts, let the user choose. With Cloud off, the game uses `%USERPROFILE%\Saved Games\Enshrouded\`. That folder currently only holds `migrated\enshrouded_user.json`; support it if saves appear there.
+- **Local saves** (not Steam): `%USERPROFILE%\Saved Games\keen games\Enshrouded\<profile>\`, for example `default`. The game lists Steam characters and local characters separately, and numbers them separately (a local character created first is `character0.ksd` there, whatever the Steam folder holds). The editor scans every `<profile>` folder that holds `character*.ksd`.
 - **Game install:** `D:\SteamLibrary\steamapps\common\Enshrouded\` on this machine. Find it through Steam's `libraryfolders.vdf`; if it isn't found, let the user browse once and remember the choice. Contents: `enshrouded.exe` (33.7 MB), `enshrouded.kfc` (9 MB), `enshrouded.kfc_resources` (205 MB), and `enshrouded_000.dat` … `enshrouded_054.dat` (about 50 GB).
 - **Game version:** 1.0, which launched 2026-10-15. The owner's saves were written by this build.
 
@@ -128,7 +129,7 @@ Little-endian throughout.
 
 ### 6.3 `character_data`
 
-`[u8 flag][4-byte signature 93 7B 40 B6][u32 name length][UTF-8 name][rest…]`. The rest holds the header GUID, a timestamp and further unmapped data. The name was verified as "Amadis" on all three files. Kimikozi's `setName` rewrites the length and the bytes, so names can change length.
+`[u8 flag][4-byte storage tag][u32 name length][UTF-8 name][rest…]`. The rest holds the header GUID, a timestamp and further unmapped data. Bytes 1–4 are a storage tag, not a fixed signature: Steam characters carry `93 7B 40 B6`, a local character made in the game carries `a8 23 b2 28` (verified on the local "Test" character). The editor keeps whatever tag it reads, and a copy placed in another storage takes the tag of a game-made character there. The name was verified as "Amadis" on all three files. Kimikozi's `setName` rewrites the length and the bytes, so names can change length.
 
 **The name is stored nowhere else.** This was verified by searching every decompressed section, in UTF-8 and UTF-16, of all three character files, of `global.ksd` (`known_players`, `adventure_subscriptions`, `user_data`) and of `world2.ksd` (13 sections, including `known_users`). The only hits were in `character_data`. A rename therefore touches only the character file.
 
@@ -316,6 +317,7 @@ Every item below is verified **in the real game**: edit the save, load it in Ens
   - write experiments only into that copy;
   - nothing else in `remote\` is touched.
 - The copy needs its own identity so the game doesn't confuse it with the original. Give it a new GUID in both the header and `character_data`, and a recognisable name such as "Amadis Test".
+- **Session A finding (2026-10-25):** the game never sees copies placed in the Steam folder. It lists Steam characters through Steam's own catalogue (`remotecache.vdf`), which only knows files the game wrote, so a copy there is invisible. In-game checks therefore use **local copies**: the owner creates one local character in the game (storage tag `a8 23 b2 28`), and the Lab tool writes the experiment copies into the local folder (`Saved Games\keen games\Enshrouded\default\`, numbered after the game-made character), taking the storage tag from that game-made character. The Steam folder is not written at all.
 - The first in-game session confirms that the game lists the copy. If it doesn't, stop and ask the owner. Don't fall back to writing anything else.
 - The Lab tool refuses any write whose target already exists and isn't a copy it created itself. The finished editor's own **Save changes** is the only code path that may replace a real character file. It is used only by the owner, after the checks pass.
 

@@ -15,6 +15,19 @@ public static class Fixtures
 
     public static string RealBackup => Existing(Path.Combine(RepoRoot, "tests", "fixtures", "real", "backup"));
 
+    /// <summary>The local (non-Steam) fixture folder: one game-made character0.ksd ("Test").</summary>
+    public static string RealLocal => Existing(Path.Combine(RepoRoot, "tests", "fixtures", "real", "local"));
+
+    /// <summary>Copies the local fixture to a fresh temp folder.</summary>
+    public static string CopyLocalToTemp()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "enshrouded-tests-local-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        foreach (var f in Directory.GetFiles(RealLocal))
+            File.Copy(f, Path.Combine(dir, Path.GetFileName(f)));
+        return dir;
+    }
+
     /// <summary>Copies the real remote fixtures to a fresh temp folder so tests can write freely.</summary>
     public static string CopyToTemp()
     {

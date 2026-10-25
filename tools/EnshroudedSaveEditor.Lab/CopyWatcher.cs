@@ -31,7 +31,8 @@ public sealed class CopyWatcher
         var sep = Path.DirectorySeparatorChar;
         if (norm.Contains($"{sep}userdata{sep}", StringComparison.OrdinalIgnoreCase)
             || norm.Contains($"{sep}1203620{sep}", StringComparison.OrdinalIgnoreCase)
-            || norm.Contains($"{sep}Saved Games{sep}Enshrouded{sep}", StringComparison.OrdinalIgnoreCase))
+            || norm.Contains($"{sep}Saved Games{sep}Enshrouded{sep}", StringComparison.OrdinalIgnoreCase)
+            || norm.Contains($"{sep}keen games{sep}Enshrouded{sep}", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(Refuse());
 
         foreach (var e in registry.List())

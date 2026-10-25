@@ -29,10 +29,24 @@ public class CharacterDataTests
     }
 
     [Fact]
-    public void CharacterData_rejects_bad_signature()
+    public void CharacterData_rejects_truncated_record()
     {
         var raw = KsdFile.Parse(Fixtures.Read("character2.ksd"))["character_data"].GetData();
-        raw[1] ^= 0xFF;
-        Assert.Throws<KsdFormatException>(() => CharacterData.Parse(raw));
+        Assert.Throws<KsdFormatException>(() => CharacterData.Parse(raw[..8]));
+        Assert.Throws<KsdFormatException>(() => CharacterData.Parse(raw[..20]));
+    }
+
+    [Fact]
+    public void CharacterData_reads_the_local_fixture_with_its_storage_tag()
+    {
+        var k = KsdFile.Parse(File.ReadAllBytes(Path.Combine(Fixtures.RealLocal, "character0.ksd")));
+        var raw = k["character_data"].GetData();
+        var cd = CharacterData.Parse(raw);
+        Assert.Equal("Test", cd.Name);
+        Assert.Equal(0, cd.SlotIndex);
+        Assert.Equal(new byte[] { 0xa8, 0x23, 0xb2, 0x28 }, cd.StorageTag);
+        Assert.Equal(raw, cd.ToBytes());
+        Assert.Equal(new byte[] { 0x93, 0x7B, 0x40, 0xB6 },
+            CharacterData.Parse(Fixtures.Read("character2.ksd") is var b ? KsdFile.Parse(b)["character_data"].GetData() : []).StorageTag);
     }
 }
