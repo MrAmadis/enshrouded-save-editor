@@ -40,6 +40,38 @@ public static class Fixtures
 
     public static byte[] Read(string fileName) => File.ReadAllBytes(Path.Combine(RealRemote, fileName));
 
+    static string ExperimentsRoot => Path.Combine(RepoRoot, "tests", "fixtures", "experiments");
+
+    /// <summary>Stands in for the capture list when the git-ignored experiments folder is missing.</summary>
+    public const string NoCaptures = "(no experiment captures)";
+
+    /// <summary>
+    /// Every <c>.ksd</c> under <c>tests/fixtures/experiments/</c> (git-ignored: the Lab copies of session A, and the
+    /// game's autosaves of them that <c>watch</c> captured), as paths relative to that folder with <c>/</c>. When the
+    /// folder is missing it holds only <see cref="NoCaptures"/>, so a theory over it runs once and skips.
+    /// </summary>
+    public static TheoryData<string> ExperimentCaptures()
+    {
+        var data = new TheoryData<string>();
+        if (Directory.Exists(ExperimentsRoot))
+            foreach (var f in Directory.EnumerateFiles(ExperimentsRoot, "*.ksd", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+                data.Add(Path.GetRelativePath(ExperimentsRoot, f).Replace('\\', '/'));
+        if (data.Count == 0) data.Add(NoCaptures);
+        return data;
+    }
+
+    /// <summary>The bytes of one capture (see <see cref="ExperimentCaptures"/>); skips the test when it is missing.</summary>
+    public static byte[] ReadCapture(string relativePath)
+    {
+        var path = Path.Combine(ExperimentsRoot, relativePath);
+        if (relativePath == NoCaptures || !File.Exists(path))
+            Assert.Skip($"Experiment capture missing: {path}");
+        return File.ReadAllBytes(path);
+    }
+
+    /// <summary>The local game-made character0.ksd ("Test", level 1, made in the game for session A).</summary>
+    public static byte[] ReadLocal(string fileName) => File.ReadAllBytes(Path.Combine(RealLocal, fileName));
+
     /// <summary>
     /// The whole character2.ksd file with its player_character end anchor broken (<c>02 00 03 00 …</c> → <c>09 …</c>),
     /// as InventoryTests.Unrecognised_tail_falls_back_to_in_place_edits does, so its inventory opens

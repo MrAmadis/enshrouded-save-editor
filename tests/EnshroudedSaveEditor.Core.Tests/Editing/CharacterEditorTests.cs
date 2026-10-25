@@ -27,18 +27,22 @@ public class CharacterEditorTests : IDisposable
     public void SetName_rejects_invalid()
     {
         var s = Open(); var e = new CharacterEditor(s);
-        foreach (var bad in new[] { "", "   ", new string('x', 33), "a\u0001b", "Amadis", "  Amadis  " })
+        foreach (var bad in new[] { "", "   ", new string('x', 16), "a\u0001b", "Amadis", "  Amadis  " })
             Assert.Throws<EditRejectedException>(() => e.SetName(bad));
+        Assert.Equal("The name can be at most 15 characters.", Assert.Throws<EditRejectedException>(() => e.SetName(new string('x', 16))).Message);
         Assert.Equal(0, s.ChangeCount);
         Assert.Equal("Amadis", s.Character.Name);
     }
 
+    // Session A: the in-game character creator accepts up to 15 characters (the game still shows a longer name
+    // written directly, but the editor matches the creator).
     [Fact]
-    public void SetName_accepts_32_chars_and_trims()
+    public void SetName_accepts_15_chars_and_trims()
     {
         var s = Open(); var e = new CharacterEditor(s);
-        e.SetName("  " + new string('x', 32) + " ");
-        Assert.Equal(new string('x', 32), s.Character.Name);
+        Assert.Equal(15, CharacterEditor.MaxNameLength);
+        e.SetName("  " + new string('x', 15) + " ");
+        Assert.Equal(new string('x', 15), s.Character.Name);
         Assert.Equal(1, s.ChangeCount);
     }
 

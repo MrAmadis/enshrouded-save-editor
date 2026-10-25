@@ -4,14 +4,18 @@ namespace EnshroudedSaveEditor.Core.Editing;
 
 public sealed class CharacterEditor(SaveSession s)
 {
-    public const int MaxNameLength = 32;
+    /// <summary>
+    /// The in-game character creator's limit (session A, docs/research/in-game-findings.md). The game shows a longer
+    /// name written directly, but the editor matches the creator.
+    /// </summary>
+    public const int MaxNameLength = 15;
 
     void EnsureWritable()
     {
         if (s.ReadOnly) throw new EditRejectedException($"This save is read-only: {s.ReadOnlyReason}");
     }
 
-    /// <summary>Trimmed; 1 to 32 UTF-16 characters; no control characters.</summary>
+    /// <summary>Trimmed; 1 to <see cref="MaxNameLength"/> UTF-16 characters; no control characters.</summary>
     public void SetName(string name)
     {
         EnsureWritable();

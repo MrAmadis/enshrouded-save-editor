@@ -27,6 +27,9 @@ public static partial class Experiments
     const uint CopperArrow = 0xf12faa48, HealthPotion = 0xccd46f7a, FireballI = 0xe988b200, CopperOre = 0x2b9d5b6f,
         WolfsSnarlLongbow = 0x29433573, AdventurerHelmet = 0xff1b25e5, RingOfHealth = 0xf29b7aa9;
 
+    /// <summary>The Extra slots "Test Slots" fills (session A: 0–7, the then-provisional capacity).</summary>
+    const int SlotsExtra = 8;
+
     [GeneratedRegex(@"^character\d+\.ksd$", RegexOptions.IgnoreCase)]
     private static partial Regex CharacterFile();
 
@@ -178,14 +181,14 @@ public static partial class Experiments
         var extra = s.Player.Container(ContainerKind.Extra)!.Records;
         inv.Clear(); extra.Clear();
         for (var i = 0; i < InventoryLayout.InventorySlots; i++) inv.Add(new ItemRecord((byte)i, CopperArrow, (ushort)(i + 1)));
-        for (var i = 0; i < InventoryLayout.ExtraSlots; i++) extra.Add(new ItemRecord((byte)i, CopperArrow, (ushort)(100 + i)));
+        for (var i = 0; i < SlotsExtra; i++) extra.Add(new ItemRecord((byte)i, CopperArrow, (ushort)(100 + i)));
         s.MarkChanged();
         Save(s, reg, backups, probe);
         return new Made(SlotsName, path, "slot map: screenshot inventory and hotbar; which counts appear where, which are missing",
         [
             "Inventory and Extra cleared (Equipped untouched)",
             $"Copper Arrow in Inventory slots 0-{InventoryLayout.InventorySlots - 1}, count = slot+1 (1..{InventoryLayout.InventorySlots})",
-            $"Copper Arrow in Extra slots 0-{InventoryLayout.ExtraSlots - 1}, count = 100+slot (100..{99 + InventoryLayout.ExtraSlots})",
+            $"Copper Arrow in Extra slots 0-{SlotsExtra - 1}, count = 100+slot (100..{99 + SlotsExtra})",
         ]);
     }
 
@@ -265,12 +268,12 @@ public static partial class Experiments
                 ?? (!haveThree ? candidates.FirstOrDefault(n => n.MaxRank >= 3 && n.Cost * 2 <= avail) : null)
                 ?? candidates.FirstOrDefault();
             if (pick is null) break;
-            ed.Learn(pick.Id, PointsMode.GameRules);
+            ed.Learn(pick.Id);
             learnedNew.Add(pick.Id);
             var rank = 1;
             if (!haveThree && pick.MaxRank >= 3 && ed.Points().Available >= pick.Cost)
             {
-                ed.Learn(pick.Id, PointsMode.GameRules);
+                ed.Learn(pick.Id);
                 haveThree = true; rank = 2;
             }
             if (pick.Type == SkillNodeType.Passive) havePassive = true;
@@ -293,7 +296,7 @@ public static partial class Experiments
         var n = 0;
         for (var i = 0; i < s.Player.Skills.Count; i++)
             if (s.Player.Skills[i].Rank == 0) { s.Player.Skills[i] = s.Player.Skills[i] with { Rank = 1 }; n++; }
-        s.Character = s.Character.With(name: OverspendName);   // 40 characters, bypassing the editor's 32 cap
+        s.Character = s.Character.With(name: OverspendName);   // 40 characters, bypassing the editor's name cap (32 then, 15 now)
         s.MarkChanged();
         Save(s, reg, backups, probe);
         return new Made(OverspendName, path, "overspend/long name: tree kept, clamped or reset? full name shown? new-character name box limit",

@@ -4,8 +4,8 @@ using EnshroudedSaveEditor.Core.Records;
 namespace EnshroudedSaveEditor.Core.Editing;
 
 /// <summary>
-/// The optional fields of a newly added item record. These rules are provisional (my calls, checked in-game
-/// by Task 11's "Test Items" copy).
+/// The optional fields of a newly added item record. These rules are my calls; session A's "Test Items" copy
+/// showed the game keeps the field sets they give a bow, an armour piece and a ring (docs/research/in-game-findings.md).
 /// </summary>
 public static class NewItemFields
 {

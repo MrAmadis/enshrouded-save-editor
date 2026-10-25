@@ -51,7 +51,7 @@
   - Product name "Enshrouded Save Editor"; wordmark "ENSHROUDED" over "SAVE EDITOR".
   - Tabs: "Character", "Inventory", "Skills".
   - Buttons: "Save changes", "Backups", "+ Add item", "Remove from backpack", "Add to backpack", "Close", "Refund all", "Undo".
-  - Points switch: "Game rules" / "Unlimited". Chips: "1", "Half", "Max".
+  - Chips: "1", "Half", "Max". (No points switch: Task 12 dropped Unlimited, because the game resets an overspent tree.)
   - Placeholders: "Search all items…", "Find a skill…".
   - Errors: "No room in the backpack", "This save is read-only: {reason}", "Enshrouded is running. Close it to save."
 - **Style tokens** (from the approved mockups):
@@ -86,7 +86,7 @@ Failure modes the spec implies but no feature test exercises directly, most like
 4. **Invalid numbers and names:**
    - a stack of 0, above max, or negative; text in a number field;
    - level outside 1–50; negative XP;
-   - a name that is empty, longer than 32 characters, or contains control characters.
+   - a name that is empty, longer than 15 characters (the in-game creator's limit, Task 12), or contains control characters.
 
    Each is rejected with a message, and nothing changes. Tests: Task 8 `SetName_rejects_invalid`, `SetLevel_rejects_out_of_range`; Task 10 `SetCount_rejects_invalid`; Task 14 `NumberField_rejects_non_numeric_input`.
 5. **A Lab or test write aimed at a real save** (the owner's rule). It is refused before any byte is written. Tests: Task 6 `Lab_refuses_unregistered_target`, `Lab_refuses_when_guid_no_longer_matches`, `Copy_never_overwrites_an_existing_file`.
@@ -564,7 +564,7 @@ public void Rewards_found_in_knowledge_sum_as_observed(string file, int points) 
   - `sealed record PointsSummary(int FromLevels, int FromRewards, int Spent, int Available)`
   - `static class SkillPoints`: `PointsSummary Compute(uint level, IEnumerable<SkillEntry> skills, SkillGraph tree, PlayerKnowledge knowledge, IReadOnlyDictionary<uint, SkillReward> rewards)`. Unknown node ids cost 0.
   - `sealed class CharacterEditor(SaveSession s)`:
-    - `void SetName(string name)`: trimmed, 1–32 characters, no control characters;
+    - `void SetName(string name)`: trimmed, 1–32 characters, no control characters (Task 12: 1–15, the in-game creator's limit);
     - `void SetLevel(int level, int cap)`: 1..cap;
     - `void SetXp(long xp)`: 0..`uint.MaxValue`.
     - Each call is one `MarkChanged()`. A no-op is rejected ("Already {value}").
@@ -574,7 +574,7 @@ public void Rewards_found_in_knowledge_sum_as_observed(string file, int points) 
 ```csharp
 [Theory, InlineData("character0.ksd", 22, 18, 0, 40), InlineData("character1.ksd", 34, 35, 0, 69), InlineData("character2.ksd", 12, 10, 22, 0)]
 public void Points_match_the_saves(string f, int lv, int rw, int sp, int av) { }
-[Fact] public void SetName_rejects_invalid() { /* "", "   ", 33 chars, "a\u0001b" → EditRejectedException; nothing changed (ChangeCount 0) */ }
+[Fact] public void SetName_rejects_invalid() { /* "", "   ", 33 chars (16 since Task 12), "a\u0001b" → EditRejectedException; nothing changed (ChangeCount 0) */ }
 [Fact] public void SetName_writes_new_name() { /* "Amadis the Bold" → Character.Name; Save → reparse */ }
 [Fact] public void SetLevel_rejects_out_of_range() { /* 0, 51 with cap 50 → rejected */ }
 [Fact] public void Raising_level_raises_available_points() { /* character2 level 7→10: Available 0 → 6 */ }
@@ -594,7 +594,7 @@ public void Points_match_the_saves(string f, int lv, int rw, int sp, int av) { }
 **Interfaces:**
 - Consumes: Tasks 2, 7, 8.
 - Produces:
-  - `enum PointsMode { GameRules, Unlimited }`
+  - `enum PointsMode { GameRules, Unlimited }` (Task 12 removed it: `Learn(uint id)` always applies the game rules.)
   - `enum NodeState { Learned, Available, Locked }`
   - `sealed class SkillsEditor(SaveSession s, SkillGraph tree, IReadOnlyDictionary<uint, SkillReward> rewards)`:
     - `IReadOnlySet<uint> Learned`: entries with rank ≥ 1;
@@ -641,7 +641,7 @@ public void Points_match_the_saves(string f, int lv, int rw, int sp, int av) { }
 - Consumes: Tasks 3, 5, 7.
 - Produces:
   - `static class InventoryLayout`. These are **provisional** until Task 12, and each const carries a `// confirmed in-game: no` comment that Task 12 flips:
-    - `int InventorySlots = 40`, `int ExtraSlots = 8`, `int Columns = 8`;
+    - `int InventorySlots = 40`, `int ExtraSlots = 8`, `int Columns = 8`; (Task 12 replaced these with the confirmed map: `BackpackSlots`, `HotbarRows`, `ExtraCapacity(backpack)`, `BackpackGrid`, `EquipPositions`, `Fits`; an Equipped `ItemRef` is a position 0–15.)
     - `bool EquipMapKnown = false`;
     - `IReadOnlyDictionary<EquipSlot, byte[]> EquippedSlotsFor`: empty until Task 12.
   - `readonly record struct ItemRef(ContainerKind Kind, byte Slot)`
@@ -755,13 +755,13 @@ How it fits together:
 - Produces:
   - `sealed record EditorOptions(IReadOnlyList<string> SaveRoots, string AppDataRoot, IProcessProbe Probe, Func<string?>? PickFolder)`
   - `sealed class GameDataProvider(Func<IGameData> load)`: `IGameData Data` (lazy, loaded once), `string Source`.
-  - `sealed class Settings { string? GameDir; string? SaveRoot; PointsMode Mode; static Settings Load(string path); void Save(string path); }`: JSON, camelCase.
+  - `sealed class Settings { string? GameDir; string? SaveRoot; static Settings Load(string path); void Save(string path); }`: JSON, camelCase.
   - **Views:**
     - `CharacterView(string Path, string FileName, string Name, int Level, DateTime SavedAtLocal, CharacterStatus Status, string? StatusMessage, int? UnspentPoints)`
     - `ItemView(uint Id, string Name, ItemCategory? Category, Rarity? Rarity, int Count, int MaxStack, int? Level, int? MinLevel, int? MaxLevel, uint? Durability, uint? MaxDurability, bool Known, string IconUrl)`
     - `SlotView(ItemRef Ref, string? Label, ItemView? Item)`
     - `SkillNodeView(uint Id, string Name, string Description, SkillNodeType Type, SkillClass Class, int Cost, int Rank, int MaxRank, NodeState State, double X, double Y)`
-    - `SessionView(string Path, string FileName, string Name, int Level, uint Xp, int LevelCap, bool ReadOnly, string? ReadOnlyReason, InventoryStatus Inventory, IReadOnlyList<SlotView> Equipped, IReadOnlyList<SlotView> Backpack, IReadOnlyList<SlotView> Hotbar, PointsSummary Points, PointsMode Mode, IReadOnlyList<SkillNodeView> Nodes, IReadOnlyList<(uint A, uint B)> Links, IReadOnlyList<ArchetypeLabel> Labels, IReadOnlyList<string> Pending, bool CanUndo)`
+    - `SessionView(string Path, string FileName, string Name, int Level, uint Xp, int LevelCap, bool ReadOnly, string? ReadOnlyReason, InventoryStatus Inventory, IReadOnlyList<SlotView> Equipped, IReadOnlyList<SlotView> Backpack, IReadOnlyList<SlotView> Hotbar, PointsSummary Points, IReadOnlyList<SkillNodeView> Nodes, IReadOnlyList<(uint A, uint B)> Links, IReadOnlyList<ArchetypeLabel> Labels, IReadOnlyList<string> Pending, bool CanUndo)`
     - `CatalogEntryView(uint Id, string Name, ItemCategory Category, string SubCategory, Rarity BaseRarity, int MaxStack, int MinLevel, int MaxLevel, string IconUrl)`. `SubCategory` is the weapon type for Weapons, the `EquipSlot` name for Equipment, and "" otherwise.
   - `sealed class IconService(string iconCacheRoot)` (GameData): `string ItemIcon(uint id, ItemInfo? info)` and `string SkillIcon(SkillNode node)`. Until Task 20 both return the category or type glyph, `https://icons.ese/glyph/<name>.svg`, writing the SVG to the cache on first use.
   - `sealed class EditorService(EditorOptions o, GameDataProvider g, IconService icons)`:
@@ -774,7 +774,7 @@ How it fits together:
     - character: `SetName(string)`, `SetLevel(int)`, `SetXp(long)`;
     - inventory: `SetCount(ItemRef, int)`, `SetItemLevel(ItemRef, int)`, `SetRarity(ItemRef, Rarity)`, `SetDurability(ItemRef, uint, uint)`, `RemoveItem(ItemRef)`, `MoveItem(ItemRef, ItemRef)`, `(SessionView View, ItemRef Added) AddItem(uint itemId, int count, int? level, Rarity? rarity, ItemRef? target)`;
     - `IReadOnlyList<CatalogEntryView> Catalog()`: excludes `Customization`;
-    - skills: `Learn(uint)`, `IReadOnlyList<uint> DependentsOf(uint)`, `Unlearn(uint)`, `RefundAll()`, `SetMode(PointsMode)` (saved in settings);
+    - skills: `Learn(uint)`, `IReadOnlyList<uint> DependentsOf(uint)`, `Unlearn(uint)`, `RefundAll()`;
     - `SessionView Undo()`.
     - Each edit returns a `SessionView` and raises `Changed`. A read-only session rejects edits with "This save is read-only: {reason}".
   - **`ChangeLog`:** each edit appends one human line to `Pending`:
@@ -791,7 +791,7 @@ How it fits together:
 [Fact] public void Open_edit_save_round_trip() { /* c2: SetLevel(10) → Pending ["Level 7 → 10"], Points.Available 6; Save → Saved; reopen → Level 10, Pending empty */ }
 [Fact] public void Undo_reverts_last_edit_only() { }
 [Fact] public void Reload_discards_unsaved_edits() { }
-[Fact] public void Edit_rejections_carry_the_message() { /* SetCount 0 → EditRejectedException with "1"; SetName 33 chars */ }
+[Fact] public void Edit_rejections_carry_the_message() { /* SetCount 0 → EditRejectedException with "1"; SetName 16 chars */ }
 [Fact] public void Save_reports_gameRunning() { }
 [Fact] public void Save_reports_changedOnDisk() { }
 [Fact] public void Backups_are_listed_and_restorable() { /* unlisted path rejected */ }
@@ -863,8 +863,8 @@ How it fits together:
 - Produces:
   - **Name field;** level `Stepper` (1..`LevelCap`); XP `NumberField`. When `XpPerLevel` is known, it is followed by "of {need} to level {N+1}".
   - A read-only points summary: "From levels", "Elixir Wells & Shroud Roots", "Spent", "Available". Available is red when negative.
-  - **Lowering the level into overspend** shows "Your skills cost more than this level gives. Refund skills, or switch to Unlimited." The Unlimited clause is omitted if Task 12 dropped it.
-  - **Save with overspend under Game rules** asks for confirmation first.
+  - **Lowering the level into overspend** shows "Your skills cost more than this level gives. Refund skills." (Task 12 dropped Unlimited.)
+  - **Save with overspend** asks for confirmation first.
 
 - [ ] **Step 1: Write failing tests:** `Level_change_updates_points`, `Overspend_warning_appears_below_spent_level`, `Name_validation_message_shows`.
 - [ ] **Step 2: Run.** Expected: FAIL.
@@ -922,7 +922,7 @@ How it fits together:
   - **`SkillsTab`:**
     - tree panel with "+", "−", "FIT" and a zoom readout;
     - hover card: name, "rank r/max · cost c", description, and the click action ("Click to learn", "Click to rank up", "Click to unlearn");
-    - right column: the "Skill points" panel with the "Game rules" / "Unlimited" switch and From levels / Wells & Roots / Spent / Available, then the "Reskill" panel with "Find a skill…" (it flies to the first match by name and highlights it), "Refund all" (with confirmation) and "Undo".
+    - right column: the "Skill points" panel with From levels / Wells & Roots / Spent / Available, then the "Reskill" panel with "Find a skill…" (it flies to the first match by name and highlights it), "Refund all" (with confirmation) and "Undo".
   - **Clicking a learned node** at max rank unlearns it. When `DependentsOf` isn't empty, a confirmation lists the dependents by name first.
   - **Rejected learns** show the service message in the hover card for 3 s.
 
@@ -931,7 +931,6 @@ How it fits together:
   - `Learned_nodes_have_learned_class` (c2 → 15 + 12 Sparks);
   - `NodeClicked_learns_connected_node_and_updates_points`;
   - `Unlearn_with_dependents_asks_first`;
-  - `Unlimited_switch_allows_overspend` (removed if Task 12 dropped Unlimited);
   - `Find_a_skill_calls_flyTo`.
 - [ ] **Step 2: Run.** Expected: FAIL.
 - [ ] **Step 3: Implement.**

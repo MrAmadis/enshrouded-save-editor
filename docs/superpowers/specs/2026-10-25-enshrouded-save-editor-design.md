@@ -9,7 +9,7 @@ A save editor for **Enshrouded 1.0** that lets the owner change their character'
 
 **Why it exists:** the owner wants to:
 - add gear and other items, and change stack sizes, including after adding;
-- reskill the character, either within the points the game allows or with unlimited points;
+- reskill the character within the points the game allows (unlimited points were asked for too, but the game resets a tree that spends more than it earned, §10.5);
 - change level, XP and name.
 
 **Prior art, and why it isn't enough:**
@@ -30,7 +30,7 @@ A save editor for **Enshrouded 1.0** that lets the owner change their character'
 4. **Skills** (owner):
    - show the real skill tree, with zoom and pan so nodes are easy to click;
    - learn, rank up and unlearn by clicking nodes; Refund all; Undo; a skill search;
-   - a points switch with two modes: **Game rules** (points budget enforced) and **Unlimited** (no budget). If the game won't keep a tree that spends more than it earned, Unlimited is dropped and only Game rules remains (owner, §10.5).
+   - the game's points budget is enforced. *(Settled in session A: a points switch with an **Unlimited** mode was planned, but on load the game reset a tree that spent more than it earned, so Unlimited was dropped and only the game's rules remain (owner, §10.5).)*
 5. **Character** (owner): level, XP and name.
 6. **Saves the game accepts.** Every section has a valid checksum, and everything not edited is left byte-identical.
 
@@ -141,10 +141,11 @@ The layout below comes from Kimikozi's `pc.js`. The points marked verified were 
 - **XP:** u32 immediately after level. Its meaning (XP into the current level, or total XP) is unknown (§10).
 - **Skills:** u32 count, then `count × [u32 node id][u8 rank]`.
   - Verified: all 30 of character2's ids are skill-tree nodes (§7).
-  - Fifteen of character2's entries have **rank 0**. All of them are three-rank passives (Wizard, Snake Eater, Dark Arts …), and they cost nothing in the points maths. So they are probably recorded but not invested. Treat rank 0 as **not learned** for display and points, and preserve such entries unless the user changes that node *(my call; confirm in §10)*.
+  - Fifteen of character2's entries have **rank 0**. All of them are three-rank passives (Wizard, Snake Eater, Dark Arts …), and they cost nothing in the points maths. Treat rank 0 as **not learned** for display and points, and preserve such entries unless the user changes that node. *(Settled in session A: the game shows rank-0 entries as not learned and not connected.)*
   - characters 0 and 1 have no entries. A web guide says 1.0 wiped every character's tree and left the points unspent, which fits.
-- **Status effects:** u32 count, then about 27 bytes each. Some entries are longer, and Kimikozi scans forward past them. Preserve them untouched.
-- **Inventory:** containers in order: **Equipped** (slots from 0), then a header holding the record counts of **Inventory** and **Extra slots**, then their records.
+- **Status effects:** u32 count, then about 27 bytes each. Some entries are longer, and Kimikozi scans forward past them. Preserve them untouched. (Each entry describes its own length through a field mask: `docs/research/player-character.md` §2.)
+- **Inventory:** containers in order: **Equipped**, then a header holding the record counts of **Inventory** and **Extra slots**, then their records. The full layout is in `docs/research/player-character.md`.
+  - **Equipped** starts with a u32 field mask. Bits 0–15 are the equipment positions, one record each in bit order, with slot bytes 0…n−1. Each set bit 16–18 adds a u16 after the records, meaning unknown (§10.3).
   - **Record:** `[u8 slot][u32 item id][u16 count][u8 field flags]`, then optional fields in bit order:
     - bit 0: u8 item level;
     - bit 1: u32 durability, u32 max durability;
@@ -153,9 +154,9 @@ The layout below comes from Kimikozi's `pc.js`. The points marked verified were 
     - bit 4: u8 rarity (1 Common … 5 Legendary), u8 unknown;
     - bit 5: 5 bytes, a gem socket `[u32 gem item id][u8 marker 0x37]`, all zero when empty.
   - **Verified:** item ids in all three saves resolve to real items (§7). Examples: Adventurer armour pieces, Lesser Ring of Health, Hero's Shield (fields `0x3`/`0x13`), Wolf's Snarl Longbow (`0x33`), Copper Arrow ×88 (max stack 500), Scorching Wand.
-  - **Equipped slots observed:** 0–4 are one armour set (Exclusive Hollow on character0), 5–9 another (Adventurer), 10–11 rings, 12 shield, then grappling hook, glider and backpack (on character1: 13 Improved Grappling Hook, 14 Advanced Glider, 15 Small Backpack). That 0–4 are appearance (vanity) slots and 5–9 worn armour is a guess (§10).
-  - **Customization items** (for example `VC_Hair_04_06_slick_fade`, "count" 17463) sit among the records. Their count field means something else. Never show, edit or move them.
-  - The hotbar's location, and how many backpack slots a given backpack gives, are not mapped yet (§10).
+  - **Equipped positions** (mask bits; settled in session A): 0–4 appearance (vanity) helmet, chest, arms, legs and boots (Exclusive Hollow on character0); 5 helmet, 6 chest, 7 arms, 8 legs, 9 boots (Adventurer); 10–11 rings; 12 shield or ward; 13 grappling hook; 14 glider; 15 backpack. The mask marks the occupied positions. When the owner took gear off in-game, its bits cleared and the later records moved up. Weapons aren't equipped records: they sit in the action bar.
+  - **Customization items** (hair and beard, for example `VC_Hair_04_06_slick_fade`) are **not** inventory records. Their ids are in the record's header, before the level (bytes 9–16). Loose scans from the start of the record mistook them for records with odd counts (T3-R4, `docs/research/player-character.md` §1). The header is kept untouched. No inventory record in the owner's saves is a Customization item, and the editor never adds one (§8.5).
+  - **Slot map** (settled in session A): Inventory 0–15 are backpack rows 1–2, 16–23 the action bar (keys 1–8), 24–31 the second action bar row, 32–39 backpack row 3. Extra 0… are the backpack-extension rows: 8 × the rows the equipped backpack gives (§7).
 
 ### 6.5 `player_knowledge`
 
@@ -194,7 +195,7 @@ The layout below comes from Kimikozi's `pc.js`. The points marked verified were 
 
 **Not in the reference data:**
 - **The level cap and the XP-per-level table.** The 1.0 patch notes put the level cap at **50** (gear goes up to 55 when fully upgraded). Use 50 until the install reader confirms it. The XP table comes from the install; until then, show XP as a raw number without a progress bar. *(my call)*
-- **Backpack size.** Rows per backpack are in the item descriptions ("enlarges your inventory by one row … four rows", for Tiny, Small, Medium and Large, old and `_NEW` versions). The base row count and the columns come from the save and an in-game check (§10.3).
+- **Backpack size.** Rows per backpack are in the item descriptions ("enlarges your inventory by one row … four rows", for Tiny, Small, Medium and Large, old and `_NEW` versions): `Backpack_T0` 1, `T1` 1, `T1_NEW` 2, `T2` 2, `T2_NEW` 3, `T3` 3, `T3_NEW` 4. *(Settled in session A: the grid is 8 columns, the base backpack is 3 rows, and the extension adds 8 × the equipped backpack's rows; Small Backpack `_NEW` shows "Backpack Extension 16" in-game.)*
 
 **Sequencing and fallback** *(my calls)*:
 - All game data sits behind one interface in `GameData`.
@@ -231,17 +232,17 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
 
 ### 8.3 Character tab
 
-- **Name:** editable, any length. The game's own name limit is unknown, so cap it at the in-game character creator's limit once known, and until then at 32 characters *(my call)*.
+- **Name:** editable, capped at the in-game character creator's limit: **15 characters** (owner, session A). The game displays a longer name written directly, but the editor matches the creator.
 - **Level:** − / + and typing, from 1 to the game's level cap.
-  - Under Game rules, raising the level adds 2 points per level automatically, because the game derives points from level (§6.6).
-  - Lowering the level below what learned skills cost shows the overspend in red, and Save asks the user to refund skills or switch to Unlimited (if Unlimited survives §10.5) *(owner approved this guess)*.
+  - Raising the level adds 2 points per level automatically, because the game derives points from level (§6.6).
+  - Lowering the level below what learned skills cost shows the overspend in red, and Save asks the user to refund skills first *(owner approved this guess; Unlimited was dropped, §10.5)*.
 - **XP:** editable, shown against the next level's requirement once the XP table and its meaning are known (§10).
 - **Points summary:** read-only, the same numbers as the Skills tab.
 
 ### 8.4 Inventory tab (`inventory-and-picker.html`, top)
 
-- **Left: Equipped.** The real slots from the save around a figure: armour pieces, rings, shield, grappling hook, glider and backpack. Appearance slots are shown only if §10 confirms what they are.
-- **Middle: Backpack grid** with its real slot count, and the **Hotbar** if its location in the save is found.
+- **Left: Equipped.** The 16 positions from the save around a figure (§6.4): armour pieces, rings, shield, grappling hook, glider and backpack, plus the five appearance slots (confirmed in session A).
+- **Middle: Backpack grid,** 8 wide: the three base rows, then the extension rows of the equipped backpack. Below it is the **Hotbar**, the two action bar rows (§6.4).
   - Each stack shows its icon on a rarity-tinted background and a count badge.
   - Empty slots show a faint +, and clicking one opens Add item for that slot.
 - **Right: Selected panel.**
@@ -249,6 +250,8 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
   - **Gear:** level (within the item's range), rarity and durability.
   - **Remove from backpack.**
 - **Drag** to move or swap stacks, including onto equipped slots. Only items whose slot matches can go there.
+  - **For now that is a swap only:** an item replaces the equipped item of its kind, and that item goes where the new one was. Equipping into an empty slot and unequipping change the Equipped mask, and when the game changes its byte 2 alongside isn't known yet (§10.3). Until session B settles it, they are refused with a message.
+  - A smaller backpack can't be swapped in while its extension would leave items outside the grid.
 - Records that aren't shown (customization, unknown) are carried through untouched.
 
 ### 8.5 Add item (`inventory-and-picker.html`, bottom)
@@ -262,7 +265,7 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
 - **Right: Adding panel.**
   - **How many:** up to the max stack; gear is always 1.
   - **Gear:** level (default: the character's level, clamped to the item's range) and rarity (default: the item's base rarity) *(my calls)*.
-  - **Goes to:** the slot that was clicked, or the first empty one.
+  - **Goes to:** the slot that was clicked, or the first empty backpack slot: the base rows (Inventory 0–15, then 32–39), then the extension. It goes to the action bar only when that slot was clicked *(owner ruling T12-R2)*.
   - **Add to backpack.** If there's no room, it says so and adds nothing.
 - An added stack is selected straight away, so its count can be changed at once (owner).
 
@@ -275,8 +278,8 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
 - **Hover card:** name, rank (n/max), cost, description, and what a click will do.
 - **Click:** learn → rank up (for 3-rank nodes) → unlearn. **Undo** reverses the last change.
 - **Skill points panel:**
-  - **Game rules:** shows from levels, from Wells and Roots, spent, and available. A node can be learned only when it links to a learned node or a Spark, and only if enough points are available.
-  - **Unlimited:** the budget goes away, but paths must still connect (owner approved this guess).
+  - Shows from levels, from Wells and Roots, spent, and available. A node can be learned only when it links to a learned node or a Spark, and only if enough points are available.
+  - There is no Unlimited mode: the game resets an overspent tree (session A, §10.5).
   - **Unlearning** a node that others depend on lists those dependents and unlearns them too, after a confirmation. *(my call; Stoneshard "re-locks what depended on them")*
 - **Refund all** clears every learned node back to the Sparks and returns every point.
 
@@ -313,19 +316,20 @@ Every item below is verified **in the real game**: edit the save, load it in Ens
 - The builder (human or agent) never opens a real save for writing, never overwrites one, and never deletes one.
 - Automated tests and the Lab tool work on copies outside the Steam folder.
 - **In-game checks run on a copied character:**
-  - copy one real `characterN.ksd` to the next free number (`character3.ksd` on this machine);
+  - copy one real `characterN.ksd` to the next free number **in the local saves folder** (`Saved Games\keen games\Enshrouded\default\`, after the game-made local character), not in `remote\`. See the session A finding below: copies in `remote\` are invisible to the game;
   - write experiments only into that copy;
-  - nothing else in `remote\` is touched.
+  - nothing in `remote\` is touched.
 - The copy needs its own identity so the game doesn't confuse it with the original. Give it a new GUID in both the header and `character_data`, and a recognisable name such as "Amadis Test".
 - **Session A finding (2026-10-25):** the game never sees copies placed in the Steam folder. It lists Steam characters through Steam's own catalogue (`remotecache.vdf`), which only knows files the game wrote, so a copy there is invisible. In-game checks therefore use **local copies**: the owner creates one local character in the game (storage tag `a8 23 b2 28`), and the Lab tool writes the experiment copies into the local folder (`Saved Games\keen games\Enshrouded\default\`, numbered after the game-made character), taking the storage tag from that game-made character. The Steam folder is not written at all.
 - The first in-game session confirms that the game lists the copy. If it doesn't, stop and ask the owner. Don't fall back to writing anything else.
 - The Lab tool refuses any write whose target already exists and isn't a copy it created itself. The finished editor's own **Save changes** is the only code path that may replace a real character file. It is used only by the owner, after the checks pass.
 
 **How in-game checks work** *(my call, modelled on Stoneshard)*:
-- Steam Cloud will sync the copied test character. That's accepted, and it can be deleted in-game when the checks are done.
+- The test characters are local, so Steam Cloud never sees them. They can be deleted in-game when the checks are done. (The six copies session A first wrote into `remote\` were never listed by the game, and are left in place unused until the owner decides on a cleanup.)
 - Give the owner a short numbered checklist per session, and batch experiments so sessions are few. Work that doesn't depend on an answer (the container, the UI, game data) proceeds in parallel.
+- Results are recorded in `docs/research/in-game-findings.md`. Items marked **Settled** below were answered in session A (2026-10-25).
 
-1. **Round trip:** open and save with no edits gives a file the game loads identically. Then one changed block recompressed with real zstd.
+1. **Round trip:** open and save with no edits gives a file the game loads identically. Then one changed block recompressed with real zstd. **Settled:** "Test Plain" (identity only) and "Test Repack" (every section recompressed with zstd level 3, new revision and time) both load as written.
 2. **Steam Cloud:**
    - Does an edited save survive the next game launch, with Steam closed and with Steam open?
    - Is it uploaded rather than replaced by the cloud copy, and does Steam raise a conflict?
@@ -333,22 +337,22 @@ Every item below is verified **in the real game**: edit the save, load it in Ens
    - The editor never edits `remotecache.vdf` or the game's `remote\backup\` files. *(my call)*
    - If Steam must be closed while saving, the editor checks for `steam.exe` and says so before writing.
    - **If edits are still lost with Steam closed,** the owner turns Steam Cloud off for Enshrouded (owner). The game then keeps saves in `%USERPROFILE%\Saved Games\Enshrouded\`, which the editor already supports (§5). Check that the game moves or copies the characters there, and that the editor finds them.
-3. **Inventory map:** the equipped slot numbers (is 0–4 appearance and 5–9 worn armour?), the hotbar's location, how the backpack size follows the equipped backpack, and the Inventory and Extra slots containers.
+3. **Inventory map:** the equipped slot numbers (is 0–4 appearance and 5–9 worn armour?), the hotbar's location, how the backpack size follows the equipped backpack, and the Inventory and Extra slots containers. **Settled:** the slot map in §6.4, and the backpack size in §7. **Still open (session B):** when the game sets or clears the Equipped header's byte 2 (mask bits 16–18) as gear goes on and off. Until then the editor only swaps equipped items, and doesn't equip into empty slots or unequip.
 4. **New items:**
-   - Which optional fields does the game need on a fresh weapon or armour piece (level, durability, rarity, bits 2 and 3)? Compare with items the game itself created.
-   - Does a stack above its max get clamped? The UI caps it anyway.
-   - Does gear added straight to an equipped slot apply its stats?
+   - Which optional fields does the game need on a fresh weapon or armour piece (level, durability, rarity, bits 2 and 3)? Compare with items the game itself created. **Settled:** the game kept the editor's field sets for a bow, an armour piece and a ring.
+   - Does a stack above its max get clamped? The UI caps it anyway. **Settled:** yes, the game clamped Fireball I 600 to 500.
+   - Does gear added straight to an equipped slot apply its stats? (The editor adds new items to the backpack only; they are equipped by a swap.)
 5. **Skills:**
-   - What do rank-0 entries mean?
-   - Does the game check paths or points on load?
-   - What happens when more points are spent than earned (Unlimited mode)? If the game resets, clamps or rejects such a tree, **drop Unlimited** and keep Game rules only (owner). Don't add points by writing reward ids into `player_knowledge`; the owner declined that.
-   - Does a learned passive's bonus apply, or does the game need extra state?
+   - What do rank-0 entries mean? **Settled:** not learned, and not connected in the tree.
+   - Does the game check paths or points on load? **Points, settled:** it resets an overspent tree (below). Paths weren't tested apart.
+   - What happens when more points are spent than earned (Unlimited mode)? If the game resets, clamps or rejects such a tree, **drop Unlimited** and keep Game rules only (owner). Don't add points by writing reward ids into `player_knowledge`; the owner declined that. **Settled:** on load the game reset the whole tree, so **Unlimited is dropped**.
+   - Does a learned passive's bonus apply, or does the game need extra state? **Settled:** passives learned by the editor show on the stats, and the points left match (69 − 13 = 56). A node the owner learned in-game was appended at rank 1, exactly as the editor does it.
    - Do Refund all and a rebuild hold after a reload?
 6. **Level and XP:**
    - What does the XP value mean, what is the level cap, and where is the XP table in game data?
    - Does the game recompute level from XP?
-   - Does a level change keep the points maths in §6.6?
-7. **Name:** is any length accepted, and what is the creator's limit? (Storage elsewhere is ruled out, §6.3.)
+   - Does a level change keep the points maths in §6.6? **Settled:** "Test Repack" at level 9 showed 4 points available, as §6.6 gives. XP 0 shows an empty bar, which fits XP counting into the current level (still to confirm with a non-zero value).
+7. **Name:** is any length accepted, and what is the creator's limit? (Storage elsewhere is ruled out, §6.3.) **Settled:** the game displays a 40-character name, and the creator accepts 15. The editor caps names at 15 (§8.3).
 8. **Game updates:** if `SV2C` isn't version 2, or a section's data version differs from those in §6.2, or a checksum fails, or a record layout isn't recognised, open read-only with a clear message. Never write in that state.
 9. **Icons:** find and decode item and skill icon textures (§7).
 
@@ -359,7 +363,7 @@ Every item below is verified **in the real game**: edit the save, load it in Ens
   - add materials from the Materials category and change the stack right after;
   - change the Copper Arrow stack from 88 to 500;
   - add a bow at a chosen level and rarity, and equip a ring;
-  - in Skills, zoom into Ranger, spend points under Game rules, Refund all, rebuild, and try Unlimited;
+  - in Skills, zoom into Ranger, spend points, Refund all, and rebuild;
   - change level, XP and name;
   - save.
 - Load it in Enshrouded: every change is there, nothing else changed, and Steam Cloud keeps the edit.

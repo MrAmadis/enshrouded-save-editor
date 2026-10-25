@@ -84,6 +84,140 @@ public class InventoryTests
         Assert.Equal(new[] { ContainerKind.Equipped, ContainerKind.Inventory, ContainerKind.Extra }, pc.Containers.Select(c => c.Kind));
     }
 
+    static byte[] CaptureRaw(string capture) => KsdFile.Parse(Fixtures.ReadCapture(capture))["player_character"].GetData();
+
+    // Every Lab copy and every autosave the game wrote of them in session A (git-ignored; skipped when missing),
+    // including the "Test Skills" captures from 14:11:51 on, whose Equipped mask has holes.
+    [Theory, MemberData(nameof(Fixtures.ExperimentCaptures), MemberType = typeof(Fixtures))]
+    public void Every_experiment_capture_is_fully_recognised_and_round_trips(string capture)
+    {
+        var data = CaptureRaw(capture);
+        var pc = PlayerCharacter.Parse(data, IsItem);
+        Assert.Equal(InventoryStatus.Full, pc.InventoryStatus);
+        Assert.Equal(data, pc.ToBytes());
+    }
+
+    /// <summary>Offset of the Equipped header: after the skills and the status entries (27 + 30 bytes here).</summary>
+    static int EquippedHeaderAt(PlayerCharacter pc, int statusBytes) => PlayerCharacter.LevelOffset + 12 + 5 * pc.Skills.Count + 4 + statusBytes;
+
+    static int EquippedEnd(PlayerCharacter pc, int statusBytes) =>
+        EquippedHeaderAt(pc, statusBytes) + 4 + pc.Container(ContainerKind.Equipped)!.Records.Sum(r => r.EncodedLength);
+
+    static byte[] Splice(byte[] d, int at, int remove, params byte[] insert) =>
+        d.AsSpan(0, at).ToArray().Concat(insert).Concat(d.AsSpan(at + remove).ToArray()).ToArray();
+
+    // "Test Skills" after the owner took off the shield and the grappling hook (14:11:51): mask ffff → cfff.
+    [Fact]
+    public void Equipped_mask_holes_are_read_by_position()
+    {
+        var pc = PlayerCharacter.Parse(CaptureRaw("local/character5/20261025-141151.ksd"), IsItem);
+        Assert.Equal(InventoryStatus.Full, pc.InventoryStatus);
+        Assert.Equal(0x0002cfffu, pc.EquippedMask);
+        Assert.Equal([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15], pc.EquippedPositions!);
+        var eq = pc.Container(ContainerKind.Equipped)!.Records;
+        Assert.Equal(Enumerable.Range(0, 14), eq.Select(r => (int)r.Slot));    // the slot byte is the record index
+        Assert.Equal(0x534ba901u, eq[12].ItemId);                              // Advanced Glider, position 14
+        Assert.Equal(0xde38058eu, eq[13].ItemId);                              // Small Backpack, position 15
+        Assert.Equal(40, pc.Container(ContainerKind.Inventory)!.Records.Count); // the shield and hook went to the backpack
+        Assert.Single(pc.Container(ContainerKind.Extra)!.Records);
+
+        // 14:12:19: all gear off but the glider and the hook (back on): mask e01f.
+        var later = PlayerCharacter.Parse(CaptureRaw("local/character5/20261025-141219.ksd"), IsItem);
+        Assert.Equal(InventoryStatus.Full, later.InventoryStatus);
+        Assert.Equal(0x0002e01fu, later.EquippedMask);
+        Assert.Equal([0, 1, 2, 3, 4, 13, 14, 15], later.EquippedPositions!);
+        Assert.Equal([0x6aa6a1d4u, 0x534ba901u, 0xde38058eu],                  // Improved Grappling Hook, Advanced Glider, Small Backpack
+            later.Container(ContainerKind.Equipped)!.Records.Skip(5).Select(r => r.ItemId));
+        Assert.Equal(7, later.Container(ContainerKind.Extra)!.Records.Count);
+    }
+
+    [Fact]
+    public void Equipped_positions_follow_the_mask()
+    {
+        Assert.Equal(Enumerable.Range(0, 16), Load("character1.ksd").EquippedPositions!);
+        var c2 = Load("character2.ksd");
+        Assert.Equal(0x0005ffe0u, c2.EquippedMask);
+        Assert.Equal(Enumerable.Range(5, 11), c2.EquippedPositions!);
+    }
+
+    // The u32 Equipped header: bits 0–15 are item records, and each set bit 16–18 (header byte 2) adds one u16 after
+    // the records, in bit order. What the game did at 14:11:51 (03 → 02, two bytes fewer), replayed on character1.
+    [Fact]
+    public void Each_header_byte_2_bit_adds_a_u16_after_the_equipped_records()
+    {
+        var raw = Raw("character1.ksd");
+        var pc = PlayerCharacter.Parse(raw, IsItem);
+        int header = EquippedHeaderAt(pc, 57), end = EquippedEnd(pc, 57);
+        Assert.Equal(new byte[] { 0xff, 0xff, 0x03, 0x00 }, raw[header..(header + 4)]);
+        Assert.Equal(new byte[] { 0x00, 0x00, 0x01, 0x00, 0x05 }, raw[end..(end + 5)]);   // bit 16: 0, bit 17: 1, then 05 n2 x n3
+
+        var one = Splice(raw, end, 2);                             // drop bit 16's u16 …
+        one[header + 2] = 0x02;                                    // … and the bit
+        var a = PlayerCharacter.Parse(one, IsItem);
+        Assert.Equal(InventoryStatus.Full, a.InventoryStatus);
+        Assert.Equal(0x0002ffffu, a.EquippedMask);
+        Assert.Equal(38, a.Container(ContainerKind.Inventory)!.Records.Count);
+        Assert.Equal(one, a.ToBytes());
+
+        var three = Splice(raw, end + 4, 0, 0xab, 0xcd);            // add bit 18's u16 after bit 17's
+        three[header + 2] = 0x07;
+        var b = PlayerCharacter.Parse(three, IsItem);
+        Assert.Equal(InventoryStatus.Full, b.InventoryStatus);
+        Assert.Equal(16, b.Container(ContainerKind.Equipped)!.Records.Count);
+        Assert.Equal(38, b.Container(ContainerKind.Inventory)!.Records.Count);
+        Assert.Equal(three, b.ToBytes());
+
+        var stale = (byte[])raw.Clone();                           // bit cleared but its u16 kept: no longer the layout
+        stale[header + 2] = 0x02;
+        Assert.NotEqual(InventoryStatus.Full, PlayerCharacter.Parse(stale, IsItem).InventoryStatus);
+    }
+
+    // Bits 19–31 have never been seen, so their sizes are unknown: the strict layout refuses them.
+    [Fact]
+    public void An_unknown_equipped_header_bit_is_not_the_strict_layout()
+    {
+        var raw = Raw("character2.ksd");
+        var pc = PlayerCharacter.Parse(raw, IsItem);
+        int header = EquippedHeaderAt(pc, 57), end = EquippedEnd(pc, 57);
+        var data = Splice(raw, end + 4, 0, 0x00, 0x00);
+        data[header + 2] = 0x0d;                                   // 05 | bit 19
+        var re = PlayerCharacter.Parse(data, IsItem);
+        Assert.Equal(InventoryStatus.InPlaceOnly, re.InventoryStatus);
+        Assert.Equal(Enumerable.Range(5, 11), re.EquippedPositions!);
+        Assert.Equal(data, re.ToBytes());
+    }
+
+    [Fact]
+    public void Equipped_slot_bytes_must_be_the_record_index()
+    {
+        var raw = Raw("character2.ksd");
+        var pc = PlayerCharacter.Parse(raw, IsItem);
+        var lastAt = EquippedEnd(pc, 57) - pc.Container(ContainerKind.Equipped)!.Records[^1].EncodedLength;
+        Assert.Equal(10, raw[lastAt]);
+        var data = (byte[])raw.Clone();
+        data[lastAt] = 12;                                         // still increasing, but not the index
+        var re = PlayerCharacter.Parse(data, IsItem);
+        Assert.Equal(InventoryStatus.InPlaceOnly, re.InventoryStatus);
+        Assert.Equal(data, re.ToBytes());
+
+        pc.Container(ContainerKind.Equipped)!.Records[^1].Slot = 12;
+        Assert.Throws<InvalidOperationException>(() => pc.ToBytes());
+    }
+
+    // The game-made local "Test" (level 1): one Equipped record (Threadbare Pants, position 8), then zeros where a
+    // played character has 05 n2 x n3 and the 02 00 03 00 tail. That shape isn't the strict layout.
+    [Fact]
+    public void The_fresh_local_character_is_read_in_place_only()
+    {
+        var raw = KsdFile.Parse(Fixtures.ReadLocal("character0.ksd"))["player_character"].GetData();
+        var pc = PlayerCharacter.Parse(raw, IsItem);
+        Assert.Equal(InventoryStatus.InPlaceOnly, pc.InventoryStatus);
+        Assert.Equal(0x00000100u, pc.EquippedMask);
+        Assert.Equal([8], pc.EquippedPositions!);
+        Assert.Equal(0xecc1c60cu, Assert.Single(pc.Container(ContainerKind.Equipped)!.Records).ItemId);
+        Assert.Equal(raw, pc.ToBytes());
+    }
+
     [Fact]
     public void Count_edit_changes_only_two_bytes()
     {
@@ -167,6 +301,7 @@ public class InventoryTests
 
         Assert.Equal(InventoryStatus.InPlaceOnly, pc.InventoryStatus);
         Assert.Equal(11, pc.Container(ContainerKind.Equipped)!.Records.Count);
+        Assert.Equal(Enumerable.Range(5, 11), pc.EquippedPositions!);  // the header just before the run fits it
         Assert.Equal(21, pc.Container(ContainerKind.Inventory)!.Records.Count);
         Assert.Equal(raw, pc.ToBytes());
 
@@ -208,6 +343,8 @@ public class InventoryTests
         Assert.Equal(InventoryStatus.NotFound, pc.InventoryStatus);
         Assert.Empty(pc.Containers);
         Assert.Null(pc.Container(ContainerKind.Equipped));
+        Assert.Null(pc.EquippedMask);
+        Assert.Null(pc.EquippedPositions);
         Assert.Equal(data, pc.ToBytes());
     }
 }

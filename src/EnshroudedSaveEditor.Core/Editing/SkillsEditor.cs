@@ -4,8 +4,6 @@ using EnshroudedSaveEditor.Core.Records;
 
 namespace EnshroudedSaveEditor.Core.Editing;
 
-public enum PointsMode { GameRules, Unlimited }
-
 public enum NodeState { Learned, Available, Locked }
 
 public sealed class SkillsEditor(SaveSession s, SkillGraph tree, IReadOnlyDictionary<uint, SkillReward> rewards)
@@ -40,7 +38,12 @@ public sealed class SkillsEditor(SaveSession s, SkillGraph tree, IReadOnlyDictio
     public PointsSummary Points() =>
         SkillPoints.Compute(s.Player.Level, s.Player.Skills, tree, s.Knowledge, rewards);
 
-    public void Learn(uint id, PointsMode mode)
+    /// <summary>
+    /// Learns the node or ranks it up, under the game's rules: it must link to a learned node or a Spark, and its cost
+    /// must fit the available points. There is no unlimited mode: the game resets a tree that spends more than it
+    /// earned (session A, T12-R1).
+    /// </summary>
+    public void Learn(uint id)
     {
         EnsureWritable();
         var node = tree.Find(id) ?? throw new EditRejectedException("Unknown skill.");
@@ -49,7 +52,7 @@ public sealed class SkillsEditor(SaveSession s, SkillGraph tree, IReadOnlyDictio
         var idx = s.Player.Skills.FindIndex(e => e.NodeId == id);
         var rank = idx >= 0 ? s.Player.Skills[idx].Rank : 0;
         if (rank >= Math.Max(node.MaxRank, 1)) throw new EditRejectedException("Already at max rank");
-        if (mode == PointsMode.GameRules && Points().Available < node.Cost)
+        if (Points().Available < node.Cost)
             throw new EditRejectedException("Not enough skill points");
         var entry = new SkillEntry(id, (byte)(rank + 1));
         if (idx >= 0) s.Player.Skills[idx] = entry; else s.Player.Skills.Add(entry);

@@ -35,15 +35,12 @@ public class SkillsEditorTests : IDisposable
     }
 
     [Fact]
-    public void Learn_requires_a_connection_in_both_modes()
+    public void Learn_requires_a_connection()
     {
         var s = Open("character1.ksd"); var e = Ed(s);
         var locked = _game.Tree.Nodes.First(n => n.Type != SkillNodeType.Spark && e.StateOf(n.Id) == NodeState.Locked);
-        foreach (var mode in new[] { PointsMode.GameRules, PointsMode.Unlimited })
-        {
-            var ex = Assert.Throws<EditRejectedException>(() => e.Learn(locked.Id, mode));
-            Assert.Contains("Connect it to a learned skill first", ex.Message);
-        }
+        var ex = Assert.Throws<EditRejectedException>(() => e.Learn(locked.Id));
+        Assert.Contains("Connect it to a learned skill first", ex.Message);
         Assert.Equal(0, s.ChangeCount);
         Assert.Empty(s.Player.Skills);
     }
@@ -54,30 +51,41 @@ public class SkillsEditorTests : IDisposable
         var s = Open("character1.ksd"); var e = Ed(s);
         var spark = _game.Tree.Sparks.First();
         Assert.Equal(NodeState.Learned, e.StateOf(spark.Id));
-        var ex = Assert.Throws<EditRejectedException>(() => e.Learn(spark.Id, PointsMode.Unlimited));
+        var ex = Assert.Throws<EditRejectedException>(() => e.Learn(spark.Id));
         Assert.Contains("Sparks are always active", ex.Message);
         Assert.Equal(NodeState.Locked, e.StateOf(0xDEADBEEF));
     }
 
+    // T12-R1: session A showed the game resets an overspent tree, so there is no Unlimited mode: Learn always
+    // enforces the points budget.
     [Fact]
-    public void GameRules_blocks_overspend_Unlimited_allows_it()
+    public void Learn_rejects_overspend()
     {
         var s = Open("character2.ksd"); var e = Ed(s);
+        var before = s.Player.Skills.ToList();
+        Assert.Equal(0, e.Points().Available);
         var avail = _game.Tree.Nodes.First(n => n.Type != SkillNodeType.Spark && n.Cost >= 1 && e.StateOf(n.Id) == NodeState.Available);
-        var ex = Assert.Throws<EditRejectedException>(() => e.Learn(avail.Id, PointsMode.GameRules));
+        var ex = Assert.Throws<EditRejectedException>(() => e.Learn(avail.Id));
         Assert.Contains("Not enough skill points", ex.Message);
         Assert.Equal(0, s.ChangeCount);
-        e.Learn(avail.Id, PointsMode.Unlimited);
-        Assert.True(e.Points().Available < 0);
-        Assert.Equal(1, s.ChangeCount);
+        Assert.Equal(0, e.Points().Available);
+        Assert.Equal(before, s.Player.Skills);
     }
 
     [Fact]
-    public void GameRules_learn_spends_cost()
+    public void Learn_has_no_points_mode()
+    {
+        Assert.Null(typeof(SkillsEditor).Assembly.GetType("EnshroudedSaveEditor.Core.Editing.PointsMode"));
+        var learn = Assert.Single(typeof(SkillsEditor).GetMethods(), m => m.Name == nameof(SkillsEditor.Learn));
+        Assert.Equal([typeof(uint)], learn.GetParameters().Select(p => p.ParameterType));
+    }
+
+    [Fact]
+    public void Learn_spends_cost()
     {
         var s = Open("character1.ksd"); var e = Ed(s);
         var avail = _game.Tree.Nodes.First(n => n.Type != SkillNodeType.Spark && e.StateOf(n.Id) == NodeState.Available);
-        e.Learn(avail.Id, PointsMode.GameRules);
+        e.Learn(avail.Id);
         Assert.Equal(69 - avail.Cost, e.Points().Available);
         Assert.Equal(1, e.RankOf(avail.Id));
     }
@@ -86,10 +94,12 @@ public class SkillsEditorTests : IDisposable
     public void Learning_a_rank0_entry_sets_rank_in_place()
     {
         var s = Open("character2.ksd"); var e = Ed(s);
+        s.Player.Level = 10;                                       // 6 points to spend (character2 has spent all 22)
         var idx = s.Player.Skills.FindIndex(x => x.Rank == 0 && e.StateOf(x.NodeId) == NodeState.Available);
         Assert.True(idx >= 0);
         var id = s.Player.Skills[idx].NodeId;
-        e.Learn(id, PointsMode.Unlimited);
+        Assert.InRange(_game.Tree.Find(id)!.Cost, 1, 6);
+        e.Learn(id);
         Assert.Equal(30, s.Player.Skills.Count);
         Assert.Equal(new SkillEntry(id, 1), s.Player.Skills[idx]);
     }
@@ -99,9 +109,9 @@ public class SkillsEditorTests : IDisposable
     {
         var s = Open("character1.ksd"); var e = Ed(s);
         var n = _game.Tree.Nodes.First(x => x.MaxRank == 3 && e.StateOf(x.Id) == NodeState.Available);
-        for (var i = 0; i < 3; i++) e.Learn(n.Id, PointsMode.Unlimited);
+        for (var i = 0; i < 3; i++) e.Learn(n.Id);
         Assert.Equal(3, e.RankOf(n.Id));
-        var ex = Assert.Throws<EditRejectedException>(() => e.Learn(n.Id, PointsMode.Unlimited));
+        var ex = Assert.Throws<EditRejectedException>(() => e.Learn(n.Id));
         Assert.Contains("Already at max rank", ex.Message);
         Assert.Equal(3, s.ChangeCount);
     }
@@ -123,7 +133,7 @@ public class SkillsEditorTests : IDisposable
     public void Unlearn_cascades_to_disconnected_nodes()
     {
         var (s, e, a, b, c) = Chain();
-        e.Learn(a, PointsMode.Unlimited); e.Learn(b, PointsMode.Unlimited); e.Learn(c, PointsMode.Unlimited);
+        e.Learn(a); e.Learn(b); e.Learn(c);
         Assert.Equal(new HashSet<uint> { b, c }, e.DependentsOf(a).ToHashSet());
         var before = s.ChangeCount;
         e.Unlearn(a);

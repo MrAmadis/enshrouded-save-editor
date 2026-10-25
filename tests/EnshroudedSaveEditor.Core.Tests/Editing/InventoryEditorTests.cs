@@ -26,9 +26,16 @@ public class InventoryEditorTests : IDisposable
     const uint AdventurerHelmet = 0xff1b25e5;   // Equipment/Helmet, levels 10–10
     const uint ThreadbarePants = 0xecc1c60c;    // Equipment/Legs, levels 0–0 (the only such gear)
     const uint ScorchingWand = 0xe589d7a4;      // character2 Inventory 16, flags 33, durability 352/363
+    const uint AlchemistHat = 0xe5a9ac59;       // character2 Equipped position 5 (record 0)
+    const uint SmallBackpackNew = 0xde38058e;   // Backpack_T1_NEW, 2 rows: character1/2 Equipped position 15
+    const uint TinyBackpack = 0x1fa74ed7;       // Backpack_T0, 1 row
+    const uint LargeBackpack = 0x3b624853;      // Backpack_T3_NEW, 4 rows
+    const uint HerosShield = 0x0262764a;        // Equipment/Shield
+    const uint ImprovedHook = 0x6aa6a1d4;       // Tools, Tool_Grappling_Hook_improved
+    const uint AdvancedGlider = 0x534ba901;     // Tools, Tool_Glider_T2
 
     const string NeedsFull = "Adding and moving items isn't available for this character yet";
-    const string EquipLocked = "Equipping and unequipping items isn't available yet";
+    const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
 
     readonly string _tmp = Fixtures.CopyToTemp();
     readonly string _backupRoot = Path.Combine(Path.GetTempPath(), "enshrouded-backups-" + Guid.NewGuid().ToString("N"));
@@ -63,7 +70,20 @@ public class InventoryEditorTests : IDisposable
         Assert.Null(e.At(Inv(35)));                                // no record
         Assert.Null(e.At(Extra(0)));
         Assert.Equal(FireballI, e.At(Inv(30))!.ItemId);
-        Assert.Equal(0xe5a9ac59u, e.At(Eq(0))!.ItemId);            // Alchemist Apprentice Hat
+        Assert.Equal(AlchemistHat, e.At(Eq(5))!.ItemId);
+    }
+
+    // An Equipped ref is a position (InventoryLayout.EquipPositions), not the record's slot byte.
+    [Fact]
+    public void Equipped_slots_are_addressed_by_position()
+    {
+        var e = Ed(Open());                                        // character2: mask ffe0, positions 5–15
+        foreach (var p in new byte[] { 0, 1, 2, 3, 4, 16, 255 }) Assert.Null(e.At(Eq(p)));
+        Assert.Equal(AlchemistHat, e.At(Eq(5))!.ItemId);
+        Assert.Equal(0x3993797au, e.At(Eq(10))!.ItemId);            // Lesser Ring of Health
+        Assert.Equal(0x53bf5455u, e.At(Eq(12))!.ItemId);            // Spectral Ward
+        Assert.Equal(SmallBackpackNew, e.At(Eq(15))!.ItemId);
+        Assert.Equal(0x01e879a5u, Ed(Open("character1.ksd")).At(Eq(0))!.ItemId);   // an appearance item
     }
 
     [Fact]
@@ -141,8 +161,8 @@ public class InventoryEditorTests : IDisposable
     public void Equipped_records_allow_in_place_edits()
     {
         var s = Open(); var e = Ed(s);
-        e.SetItemLevel(Eq(0), 5);                                  // Hat: level 10 → 5 (reference levels 5–5)
-        e.SetRarity(Eq(0), Rarity.Epic);
+        e.SetItemLevel(Eq(5), 5);                                  // Hat: level 10 → 5 (reference levels 5–5)
+        e.SetRarity(Eq(5), Rarity.Epic);
         Assert.Equal(2, s.ChangeCount);
         var eq = Records(Reparsed(s), ContainerKind.Equipped);
         Assert.Equal(11, eq.Count);
@@ -155,7 +175,7 @@ public class InventoryEditorTests : IDisposable
     public void Item_levels_run_from_1_to_55_whatever_the_reference_range()
     {
         var s = Open(); var e = Ed(s);
-        var chest = Eq(1);                                         // Alchemist Apprentice Chest: level 10, reference 5–5
+        var chest = Eq(6);                                         // Alchemist Apprentice Chest: level 10, reference 5–5
         Assert.Equal((byte)10, e.At(chest)!.Level);
         e.SetItemLevel(chest, 12);
         Assert.Equal((byte)12, e.At(chest)!.Level);
@@ -234,28 +254,69 @@ public class InventoryEditorTests : IDisposable
         Rejected(() => e.Add(ore, 1, null, Rarity.Rare, null));      // …or rarity field
         Rejected(() => e.Add(ore, 1, null, null, Inv(30)));          // taken
         Rejected(() => e.Add(ore, 1, null, null, Inv(40)));          // past the backpack
-        Rejected(() => e.Add(ore, 1, null, null, Extra(0)));         // only Inventory slots
-        Rejected(() => e.Add(ore, 1, null, null, Eq(11)));
+        Assert.Equal("There's no backpack extension slot 16.",       // Small Backpack _NEW: Extra 0–15
+            Rejected(() => e.Add(ore, 1, null, null, Extra(16))).Message);
+        Assert.Equal("New items go into the backpack.", Rejected(() => e.Add(ore, 1, null, null, Eq(11))).Message);
         Assert.Equal(0, s.ChangeCount);
         Assert.Equal(before, s.Player.ToBytes());
     }
 
+    // T12-R2: by default the backpack's base rows (Inventory 0–15, then 32–39), then its extension (Extra 0 to
+    // capacity − 1); never the action bar (Inventory 16–31).
     [Fact]
-    public void Add_rejects_when_backpack_full()
+    public void Add_fills_the_backpack_then_its_extension_and_then_has_no_room()
     {
-        var s = Open(); var e = Ed(s);
-        var free = Enumerable.Range(0, InventoryLayout.InventorySlots).Count(i => e.At(Inv((byte)i)) is null);
-        Assert.Equal(24, free);                                    // 40 − 16 real stacks (ghosts count as free)
-        for (var i = 0; i < free; i++) e.Add(Item(CopperOre), 1, null, null, null);
-        Assert.Equal(free, s.ChangeCount);
+        var s = Open(); var e = Ed(s);                             // character2: 16–31 full, 15, 32–34 and 37 ghosts
+        var expected = Enumerable.Range(0, 16).Select(i => Inv((byte)i))
+            .Concat(Enumerable.Range(32, 8).Select(i => Inv((byte)i)))
+            .Concat(Enumerable.Range(0, 16).Select(i => Extra((byte)i))).ToList();
+        var actionBar = Enumerable.Range(16, 16).Select(i => e.At(Inv((byte)i))).ToList();
+        foreach (var at in expected) Assert.Equal(at, e.Add(Item(CopperOre), 1, null, null, null));
+        Assert.Equal(40, s.ChangeCount);
 
         var before = s.Player.ToBytes();
         Assert.Equal("No room in the backpack", Rejected(() => e.Add(Item(CopperOre), 1, null, null, null)).Message);
-        Assert.Equal(free, s.ChangeCount);
+        Assert.Equal(40, s.ChangeCount);
         Assert.Equal(before, s.Player.ToBytes());
-        var inv = Records(PlayerCharacter.Parse(before, IsItem), ContainerKind.Inventory);
-        Assert.Equal(Enumerable.Range(0, 40), inv.Select(r => (int)r.Slot));
-        Assert.DoesNotContain(inv, r => r.IsGhost);
+        var re = PlayerCharacter.Parse(before, IsItem);
+        Assert.Equal(InventoryStatus.Full, re.InventoryStatus);
+        Assert.Equal(Enumerable.Range(0, 40), Records(re, ContainerKind.Inventory).Select(r => (int)r.Slot));
+        Assert.DoesNotContain(Records(re, ContainerKind.Inventory), r => r.IsGhost);
+        Assert.Equal(Enumerable.Range(0, 16), Records(re, ContainerKind.Extra).Select(r => (int)r.Slot));
+        Assert.Equal(actionBar, Enumerable.Range(16, 16).Select(i => e.At(Inv((byte)i))));
+    }
+
+    [Fact]
+    public void Add_skips_the_action_bar_unless_targeted()
+    {
+        var s = Open("character1.ksd"); var e = Ed(s);             // base rows full; action bar 30, 31 free; Extra 0 taken
+        Assert.Null(e.At(Inv(30)));
+        Assert.Equal(Extra(1), e.Add(Item(CopperOre), 5, null, null, null));
+        Assert.Null(e.At(Inv(30)));
+        Assert.Equal(Inv(30), e.Add(Item(CopperOre), 6, null, null, Inv(30)));
+        Assert.Equal(Extra(9), e.Add(Item(CopperOre), 7, null, null, Extra(9)));
+        var re = Reparsed(s);
+        Assert.Equal(InventoryStatus.Full, re.InventoryStatus);
+        Assert.Equal([(1, 5), (9, 7)], Records(re, ContainerKind.Extra).Where(r => r.ItemId == CopperOre).Select(r => ((int)r.Slot, (int)r.Count)));
+        Assert.Equal(6, Records(re, ContainerKind.Inventory).Single(r => r.Slot == 30).Count);
+    }
+
+    // T12-R2: the extension holds 8 × the rows of the equipped backpack (position 15), by internal name.
+    [Fact]
+    public void Extra_capacity_follows_the_equipped_backpack()
+    {
+        Assert.Equal(16, Ed(Open()).ExtraCapacity);                // character2: Small Backpack (Backpack_T1_NEW)
+        Assert.Equal(8, Ed(Open("character0.ksd")).ExtraCapacity); // Small Backpack (Backpack_T1)
+
+        var s = Open(); var e = Ed(s);
+        var backpack = Records(s.Player, ContainerKind.Equipped)[^1];
+        backpack.ItemId = LargeBackpack;
+        Assert.Equal(32, e.ExtraCapacity);
+        Assert.Equal(Extra(31), e.Add(Item(CopperOre), 1, null, null, Extra(31)));
+        backpack.ItemId = CopperOre;                               // not a backpack: no extension
+        Assert.Equal(0, e.ExtraCapacity);
+        Assert.Equal("There's no backpack extension slot 0.", Rejected(() => e.Add(Item(CopperOre), 1, null, null, Extra(0))).Message);
+        Assert.Equal("There's no backpack extension slot 0.", Rejected(() => e.Move(Inv(30), Extra(0))).Message);
     }
 
     [Fact]
@@ -317,7 +378,7 @@ public class InventoryEditorTests : IDisposable
         Rejected(() => e.Move(Inv(15), Inv(36)));                  // a ghost is empty
         Rejected(() => e.Move(Inv(30), Inv(30)));
         Rejected(() => e.Move(Inv(30), Inv(40)));                  // past the backpack
-        Rejected(() => e.Move(Inv(30), Extra(8)));
+        Rejected(() => e.Move(Inv(30), Extra(16)));                // past the extension (Extra 0–15)
         Assert.Equal(0, s.ChangeCount);
         Assert.Equal(before, s.Player.ToBytes());
     }
@@ -336,24 +397,150 @@ public class InventoryEditorTests : IDisposable
         Assert.DoesNotContain(inv, r => r.ItemId == FireballI);
     }
 
+    // T12-R3: an item swaps with the Equipped item in the position of its kind; the mask and record count stay.
     [Fact]
-    public void Equip_is_refused_until_the_slot_map_is_known()
+    public void Gear_swaps_with_the_equipped_item_in_its_position()
+    {
+        var s = Open(); var e = Ed(s);                             // character2, mask 0005ffe0
+        var helmet = e.Add(Item(AdventurerHelmet), 1, 10, Rarity.Rare, null);
+        var ring = e.Add(Item(RingOfHealth), 1, null, null, null);
+        var shield = e.Add(Item(HerosShield), 1, null, null, null);
+        var hook = e.Add(Item(ImprovedHook), 1, null, null, null);
+        var glider = e.Add(Item(AdvancedGlider), 1, null, null, Extra(4));
+        Assert.Equal([Inv(0), Inv(1), Inv(2), Inv(3)], new[] { helmet, ring, shield, hook });
+
+        e.Move(helmet, Eq(5));                                     // into Equipped
+        e.Move(Eq(11), ring);                                      // from Equipped onto a fitting item: the same swap
+        e.Move(Eq(10), Eq(11));                                    // ring ↔ ring
+        e.Move(shield, Eq(12));                                    // Hero's Shield for the Spectral Ward …
+        e.Move(shield, Eq(12));                                    // … and the ward back (wards go in the shield position)
+        e.Move(hook, Eq(13));
+        e.Move(glider, Eq(14));                                    // from the extension
+        Assert.Equal(12, s.ChangeCount);
+
+        Assert.Equal(AdventurerHelmet, e.At(Eq(5))!.ItemId);
+        Assert.Equal(AlchemistHat, e.At(helmet)!.ItemId);
+        Assert.Equal((RingOfHealth, 0x3993797au), (e.At(Eq(10))!.ItemId, e.At(Eq(11))!.ItemId));
+        Assert.Equal(0x0120840du, e.At(ring)!.ItemId);             // Lesser Ring of Mana
+        Assert.Equal((0x53bf5455u, HerosShield), (e.At(Eq(12))!.ItemId, e.At(shield)!.ItemId));
+        Assert.Equal((ImprovedHook, 0x55bf8eb8u), (e.At(Eq(13))!.ItemId, e.At(hook)!.ItemId));
+        Assert.Equal((AdvancedGlider, 0x3d4a78ddu), (e.At(Eq(14))!.ItemId, e.At(glider)!.ItemId));
+
+        Assert.Equal(SaveResult.Saved, s.Save(new BackupService(_backupRoot), new FakeProbe()));
+        var back = Open();
+        Assert.Equal(InventoryStatus.Full, back.Player.InventoryStatus);
+        Assert.Equal(0x0005ffe0u, back.Player.EquippedMask);
+        var eq = Records(back.Player, ContainerKind.Equipped);
+        Assert.Equal(Enumerable.Range(0, 11), eq.Select(r => (int)r.Slot));   // slot bytes stay the record index
+        Assert.Equal([AdventurerHelmet, RingOfHealth, 0x3993797au, 0x53bf5455u, ImprovedHook, AdvancedGlider, SmallBackpackNew],
+            new[] { 0, 5, 6, 7, 8, 9, 10 }.Select(i => eq[i].ItemId));
+        Assert.Equal((byte)10, eq[0].Level);
+        var b = Ed(back);
+        Assert.Equal([AlchemistHat, 0x0120840du, HerosShield, 0x55bf8eb8u], new[] { helmet, ring, shield, hook }.Select(r => b.At(r)!.ItemId));
+        Assert.Equal(0x3d4a78ddu, b.At(glider)!.ItemId);
+    }
+
+    [Fact]
+    public void Appearance_items_swap_by_the_piece_they_dress()
+    {
+        var s = Open("character0.ksd"); var e = Ed(s);             // positions 0–4: the Exclusive Hollow set
+        var hat = e.Add(Item(0xc52f14b3), 1, null, null, null);    // Blacksmith Hat (Vanity_TX_Blacksmith_Helmet)
+        Assert.Equal("Blacksmith Hat doesn't go in the Chest appearance slot.", Rejected(() => e.Move(hat, Eq(1))).Message);
+        Assert.Equal("Blacksmith Hat doesn't go in the Helmet slot.", Rejected(() => e.Move(hat, Eq(5))).Message);
+        e.Move(hat, Eq(0));
+        Assert.Equal(0xc52f14b3u, e.At(Eq(0))!.ItemId);
+        Assert.Equal(0xba08f81du, e.At(hat)!.ItemId);              // Exclusive Hollow Helmet
+        Assert.Equal(InventoryStatus.Full, Reparsed(s).InventoryStatus);
+    }
+
+    [Fact]
+    public void Swaps_reject_items_that_do_not_fit()
     {
         var s = Open(); var e = Ed(s);
         var before = s.Player.ToBytes();
-        foreach (var edit in new Action[]
-        {
-            () => e.Move(Inv(16), Eq(0)),                          // wand onto the (occupied) hat slot
-            () => e.Move(Eq(5), Inv(35)),                          // ring out to an empty slot
-            () => e.Move(Eq(5), Eq(6)),                            // ring ↔ ring
-            () => e.Move(Eq(0), Eq(11)),                           // renumber to an unused Equipped slot
-            () => e.Remove(Eq(0)),
-        })
-            Assert.Equal(EquipLocked, Rejected(edit).Message);
-        Rejected(() => e.Add(Item(RingOfHealth), 1, null, null, Eq(11)));
-        Assert.Empty(InventoryLayout.EquippedSlotsFor);
+        Assert.Equal("Scorching Wand doesn't go in the Helmet slot.", Rejected(() => e.Move(Inv(16), Eq(5))).Message);
+        Assert.Equal("Scorching Wand doesn't go in the Helmet slot.", Rejected(() => e.Move(Eq(5), Inv(16))).Message);
+        Assert.Equal("Alchemist Apprentice Hat doesn't go in the Chest slot.", Rejected(() => e.Move(Eq(5), Eq(6))).Message);
+        Rejected(() => e.Move(Eq(10), Eq(12)));                    // ring ↔ ward
+        Rejected(() => e.Move(Eq(13), Eq(14)));                    // hook ↔ glider
+        Rejected(() => e.Move(Inv(30), Eq(15)));                   // Fireball I is no backpack
         Assert.Equal(0, s.ChangeCount);
         Assert.Equal(before, s.Player.ToBytes());
+
+        var s1 = Open("character1.ksd"); var e1 = Ed(s1);          // appearance items missing from the game data
+        Assert.Equal("This item doesn't go in the Chest appearance slot.", Rejected(() => e1.Move(Eq(0), Eq(1))).Message);
+        Assert.Equal(0, s1.ChangeCount);
+    }
+
+    // T12-R3: these change the Equipped mask and record count, and when the game changes header byte 2 alongside
+    // isn't known (docs/research/in-game-findings.md), so they stay disabled.
+    [Fact]
+    public void Equipping_into_an_empty_position_and_unequipping_stay_locked()
+    {
+        var s = Open(); var e = Ed(s);                             // positions 0–4 are empty
+        var vanity = e.Add(Item(0xc52f14b3), 1, null, null, null); // Blacksmith Hat: fits position 0
+        var before = s.Player.ToBytes();
+        foreach (var edit in new Action[]
+        {
+            () => e.Move(vanity, Eq(0)),                           // into an empty position
+            () => e.Move(Eq(5), Inv(35)),                          // out to an empty slot
+            () => e.Move(Eq(5), Inv(15)),                          // … or onto a ghost
+            () => e.Move(Eq(10), Extra(0)),
+            () => e.Remove(Eq(5)),
+        })
+            Assert.Equal(EquipLocked, Rejected(edit).Message);
+        Assert.Equal("New items go into the backpack.", Rejected(() => e.Add(Item(RingOfHealth), 1, null, null, Eq(11))).Message);
+        Assert.Equal(1, s.ChangeCount);
+        Assert.Equal(before, s.Player.ToBytes());
+    }
+
+    // The "Test Skills" autosave with gear positions 5–12 empty (git-ignored capture; skipped when missing).
+    [Fact]
+    public void Gear_cannot_go_into_an_emptied_position()
+    {
+        var path = Path.Combine(_tmp, "capture.ksd");
+        File.WriteAllBytes(path, Fixtures.ReadCapture("local/character5/20261025-141219.ksd"));
+        var s = SaveSession.Open(path, IsItem); var e = Ed(s);
+        Assert.Equal(InventoryStatus.Full, s.Player.InventoryStatus);
+        Assert.Null(e.At(Eq(5)));
+        var helmet = Records(s.Player, ContainerKind.Inventory).Concat(Records(s.Player, ContainerKind.Extra))
+            .Single(r => r.ItemId == AdventurerHelmet);
+        var kind = Records(s.Player, ContainerKind.Inventory).Contains(helmet) ? ContainerKind.Inventory : ContainerKind.Extra;
+        Assert.Equal(EquipLocked, Rejected(() => e.Move(new ItemRef(kind, helmet.Slot), Eq(5))).Message);
+        Assert.Equal(EquipLocked, Rejected(() => e.Move(Eq(13), Extra(10))).Message);
+        Assert.Equal(0, s.ChangeCount);
+    }
+
+    // The extension shrinks with a smaller backpack, so a swap may not leave items past the new capacity.
+    [Fact]
+    public void Backpack_swaps_keep_the_extension_in_range()
+    {
+        var s = Open(); var e = Ed(s);                             // Small Backpack _NEW: 16 extension slots
+        var tiny = e.Add(Item(TinyBackpack), 1, null, null, null);
+        var ore = e.Add(Item(CopperOre), 3, null, null, Extra(10));
+        var before = s.Player.ToBytes();
+        const string TooSmall = "Tiny Backpack gives 8 backpack extension slots: move the items out of the others first.";
+        Assert.Equal(TooSmall, Rejected(() => e.Move(tiny, Eq(15))).Message);
+        Assert.Equal(2, s.ChangeCount);
+        Assert.Equal(before, s.Player.ToBytes());
+
+        e.Move(ore, Extra(7));
+        e.Move(tiny, Eq(15));
+        Assert.Equal(8, e.ExtraCapacity);
+        Assert.Equal(SmallBackpackNew, e.At(tiny)!.ItemId);
+        Assert.Equal("There's no backpack extension slot 8.", Rejected(() => e.Add(Item(CopperOre), 1, null, null, Extra(8))).Message);
+
+        var s2 = Open(); var e2 = Ed(s2);
+        var tinyOut = e2.Add(Item(TinyBackpack), 1, null, null, Extra(12));
+        Assert.Equal(TooSmall, Rejected(() => e2.Move(tinyOut, Eq(15))).Message);   // the old one would land in slot 12 of 8
+        var large = e2.Add(Item(LargeBackpack), 1, null, null, null);
+        e2.Move(large, Eq(15));
+        Assert.Equal(32, e2.ExtraCapacity);
+        Assert.Equal(Extra(20), e2.Add(Item(CopperOre), 1, null, null, Extra(20)));
+        var re = Reparsed(s2);
+        Assert.Equal(InventoryStatus.Full, re.InventoryStatus);
+        Assert.Equal(LargeBackpack, Records(re, ContainerKind.Equipped)[^1].ItemId);
+        Assert.Equal([12, 20], Records(re, ContainerKind.Extra).Select(r => (int)r.Slot));
     }
 
     [Fact]
@@ -367,15 +554,17 @@ public class InventoryEditorTests : IDisposable
 
         e.SetCount(Inv(30), 500);                                  // Fireball I 87 → 500
         e.SetItemLevel(Inv(16), 30);                               // same-size field edit
-        Assert.Equal(2, s.ChangeCount);
+        e.SetRarity(Eq(5), Rarity.Epic);                           // the Hat: positions come from the header before the run
+        Assert.Equal(3, s.ChangeCount);
 
         var before = s.Player.ToBytes();
         Assert.Equal(NeedsFull, Rejected(() => e.Add(Item(CopperOre), 1, null, null, null)).Message);
         Assert.Equal(NeedsFull, Rejected(() => e.Add(Item(CopperOre), 1, null, null, Inv(35))).Message);
         Assert.Equal(NeedsFull, Rejected(() => e.Move(Inv(22), Inv(35))).Message);
         Assert.Equal(NeedsFull, Rejected(() => e.Move(Inv(22), Inv(30))).Message);
+        Assert.Equal(NeedsFull, Rejected(() => e.Move(Eq(10), Eq(11))).Message);
         Assert.Equal(NeedsFull, Rejected(() => e.Remove(Inv(22))).Message);
-        Assert.Equal(2, s.ChangeCount);
+        Assert.Equal(3, s.ChangeCount);
         Assert.Equal(before, s.Player.ToBytes());
 
         var inv = Records(PlayerCharacter.Parse(before, IsItem), ContainerKind.Inventory);

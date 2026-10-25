@@ -34,10 +34,26 @@ public sealed class PlayerCharacter
 
     public ItemContainer? Container(ContainerKind k) => Containers.FirstOrDefault(c => c.Kind == k);
 
+    /// <summary>
+    /// The Equipped header's u32 field mask: bits 0–15 are the Equipped positions that hold a record, bits 16–18 the
+    /// u16 fields after the records (meaning unknown, kept as read). Null when it wasn't located. It is read only:
+    /// the Equipped record count can't change.
+    /// </summary>
+    public uint? EquippedMask { get; }
+
+    /// <summary>
+    /// The Equipped position (0–15, the mask's set bits in order) of each Equipped record, by record index; null when
+    /// the mask wasn't located.
+    /// </summary>
+    public IReadOnlyList<int>? EquippedPositions { get; }
+
     PlayerCharacter(byte[] prefix, uint level, uint xp, List<SkillEntry> skills, InventoryScan inventory)
     {
         _prefix = prefix; Level = level; Xp = xp; Skills = skills;
         InventoryStatus = inventory.Status; Containers = inventory.Containers; _tail = inventory.Parts;
+        EquippedMask = inventory.EquippedMask;
+        if (inventory.EquippedMask is { } mask)
+            EquippedPositions = Enumerable.Range(0, 16).Where(bit => (mask >> bit & 1) != 0).ToArray();
     }
 
     /// <summary>
@@ -79,7 +95,8 @@ public sealed class PlayerCharacter
     /// Writes the record, re-encoding item records where they were found. Throws
     /// <see cref="InvalidOperationException"/> for a change the located layout can't express: a record
     /// count change without a known count byte (Equipped, or any list when not <see cref="InventoryStatus.Full"/>),
-    /// a size change in an in-place layout, slots out of order, or a record the reader would reject.
+    /// a size change in an in-place layout, slots out of order, an Equipped slot byte that isn't its record index
+    /// (<see cref="InventoryStatus.Full"/>), or a record the reader would reject.
     /// </summary>
     public byte[] ToBytes()
     {
@@ -122,6 +139,8 @@ public sealed class PlayerCharacter
                     var rec = records[i];
                     if (i > 0 && rec.Slot <= records[i - 1].Slot)
                         throw new InvalidOperationException($"{r.Container.Kind} slots must be in increasing order.");
+                    if (r.IndexedSlots && rec.Slot != i)
+                        throw new InvalidOperationException($"{r.Container.Kind} record {i} must have slot byte {i}.");
                     if (rec.Count == 0 && rec.Flags != 0)
                         throw new InvalidOperationException($"{r.Container.Kind} slot {rec.Slot}: a record with fields needs a count of at least 1.");
                     if (r.FixedLengths is { } lengths && rec.EncodedLength != lengths[i])
