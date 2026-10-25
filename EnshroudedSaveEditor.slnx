@@ -1,12 +1,14 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/EnshroudedSaveEditor.Core/EnshroudedSaveEditor.Core.csproj" />
+    <Project Path="src/EnshroudedSaveEditor.GameData/EnshroudedSaveEditor.GameData.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/EnshroudedSaveEditor.Lab/EnshroudedSaveEditor.Lab.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/EnshroudedSaveEditor.Core.Tests/EnshroudedSaveEditor.Core.Tests.csproj" />
+    <Project Path="tests/EnshroudedSaveEditor.GameData.Tests/EnshroudedSaveEditor.GameData.Tests.csproj" />
     <Project Path="tests/EnshroudedSaveEditor.Lab.Tests/EnshroudedSaveEditor.Lab.Tests.csproj" />
   </Folder>
 </Solution>

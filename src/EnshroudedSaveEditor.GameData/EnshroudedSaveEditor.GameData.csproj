@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>EnshroudedSaveEditor.GameData</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EnshroudedSaveEditor.Core\EnshroudedSaveEditor.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Reference\*.json" LogicalName="Reference.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>
