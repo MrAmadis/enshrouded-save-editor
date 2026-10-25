@@ -1,0 +1,47 @@
+using System.Security.Cryptography;
+using System.Text.RegularExpressions;
+using EnshroudedSaveEditor.Core.Container;
+using EnshroudedSaveEditor.Core.Records;
+
+namespace EnshroudedSaveEditor.Core.Files;
+
+/// <summary>Makes a new character file from an existing one. Never modifies or overwrites any existing file.</summary>
+public static partial class CharacterCopier
+{
+    [GeneratedRegex(@"^character(\d+)\.ksd$", RegexOptions.IgnoreCase)]
+    private static partial Regex CharacterFile();
+
+    public static string Copy(string remoteDir, string fromFile, string newName, LabCopyRegistry registry)
+    {
+        var sourcePath = Path.IsPathRooted(fromFile) ? fromFile : Path.Combine(remoteDir, fromFile);
+        var file = KsdFile.Parse(File.ReadAllBytes(sourcePath));
+
+        var guid = RandomNumberGenerator.GetBytes(16);
+        var max = -1;
+        foreach (var f in Directory.EnumerateFiles(remoteDir, "*.ksd"))
+        {
+            var m = CharacterFile().Match(Path.GetFileName(f));
+            if (m.Success && int.TryParse(m.Groups[1].ValueSpan, out var n) && n > max) max = n;
+        }
+
+        for (var n = max + 1; n <= 255; n++)
+        {
+            var cd = CharacterData.Parse(file["character_data"].GetData()).With(name: newName, slotIndex: (byte)n, guid: guid);
+            file["character_data"].SetData(cd.ToBytes());
+            file.Guid = guid;
+            var bytes = file.ToBytes();
+
+            var target = Path.Combine(remoteDir, $"character{n}.ksd");
+            try
+            {
+                using (var fs = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                    fs.Write(bytes);
+            }
+            catch (IOException) when (File.Exists(target)) { continue; }
+
+            registry.Register(target, guid);
+            return target;
+        }
+        throw new InvalidOperationException("No free character slot number below 256.");
+    }
+}
