@@ -1,0 +1,303 @@
+@implements IDisposable
+@inject EditorService EditorService
+@inject IAssetUrls AssetUrls
+
+@{
+    var s = EditorService.Current;
+    // In-place edits (count, level, rarity, durability) work on any located inventory; adding, moving and removing
+    // need a Full one. The service's own message says why they're off.
+    var canEdit = !s.ReadOnly && s.Inventory != InventoryStatus.NotFound;
+    var canMove = !s.ReadOnly && s.Inventory == InventoryStatus.Full;
+    var moveOff = s.ReadOnly ? $"This save is read-only: {s.ReadOnlyReason}" : canMove ? null : InventoryEditor.NeedsFull;
+    var selected = SelectedSlot(s);
+}
+@if (s.Inventory == InventoryStatus.NotFound)
+{
+    <Banner Kind="warn">@InventoryEditor.Unread</Banner>
+}
+else
+{
+    @if (!s.ReadOnly && !canMove)
+    {
+        <Banner Kind="warn">@InventoryEditor.NeedsFull</Banner>
+    }
+    @if (_error is not null)
+    {
+        <Banner Kind="error">@_error</Banner>
+    }
+
+    <div class="inventory">
+        <section class="panel equipped">
+            <div class="ph"><h4>Equipped</h4></div>
+            <div class="equip">
+                <div class="figure" aria-hidden="true">
+                    <svg viewBox="0 0 60 200"><circle cx="30" cy="18" r="13" /><path d="M14 36h32l8 60-8 2-4-40v50l4 88H34l-4-70-4 70H14l4-88V58l-4 40-8-2z" /></svg>
+                </div>
+                @foreach (var slot in s.Equipped.Where(e => !Position(e).IsAppearance))
+                {
+                    var (row, col) = GearCell(Position(slot));
+                    <div class="gear-cell" style="grid-row:@row;grid-column:@col">
+                        @Slot(slot, canMove, moveOff, caption: slot.Label)
+                    </div>
+                }
+            </div>
+            <div class="appearance">
+                <div class="ph"><h4>Appearance</h4></div>
+                <div class="appearance-row">
+                    @foreach (var slot in s.Equipped.Where(e => Position(e).IsAppearance))
+                    {
+                        @Slot(slot, canMove, moveOff, caption: Short(slot.Label), cls: "appearance-slot")
+                    }
+                </div>
+            </div>
+        </section>
+
+        <section class="panel backpack">
+            <div class="ph">
+                <h4>Backpack</h4>
+                <span>
+                    @s.Backpack.Count(b => b.Item is not null) / @s.Backpack.Count slots
+                    <button class="btn add-item" disabled="@(!canMove)" title="@moveOff" @onclick="() => OpenAdd(null)">+ Add item</button>
+                </span>
+            </div>
+            <div class="bag-grid bag">
+                @foreach (var slot in s.Backpack)
+                {
+                    @Slot(slot, canMove, moveOff, cls: slot.Ref.Kind == ContainerKind.Extra ? "extension" : null)
+                }
+            </div>
+
+            @if (s.Hotbar.Count > 0)
+            {
+                <div class="action-bar">
+                    <div class="ph"><h4>Action bar</h4></div>
+                    @foreach (var row in s.Hotbar.Chunk(InventoryLayout.Columns))
+                    {
+                        <div class="bag-grid bar-row">
+                            @foreach (var slot in row)
+                            {
+                                @Slot(slot, canMove, moveOff, key: slot.Label)
+                            }
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (s.Overflow.Count > 0)
+            {
+                <div class="outside">
+                    <div class="ph"><h4>Outside the backpack</h4><span>@s.Overflow.Count</span></div>
+                    <p class="muted">These are kept past the end of the equipped backpack. Drag them into a free slot to use them.</p>
+                    <div class="bag-grid">
+                        @foreach (var slot in s.Overflow)
+                        {
+                            @Slot(slot, canMove, moveOff)
+                        }
+                    </div>
+                </div>
+            }
+        </section>
+
+        <aside class="panel detail">
+            @if (selected is { Item: { } item } sel)
+            {
+                <div class="ph"><h4>Selected</h4><span class="where">@ItemText.Where(s, sel.Ref)</span></div>
+                <div class="big">
+                    <span class="slot @ItemText.RarityClass(item.Rarity)"><img class="icon" src="@item.IconUrl" alt="" /></span>
+                    <div>
+                        <div class="name">@item.Name</div>
+                        <div class="sub">@ItemText.Category(item.Category)@if (item.Rarity is { } rarity) {<text> · </text><span class="@ItemText.RarityColor(rarity)">@rarity</span>}</div>
+                    </div>
+                </div>
+                <div @key="sel.Ref">
+                    @if (ItemText.IsStack(item))
+                    {
+                        <div class="field stack">
+                            <label>Stack</label>
+                            <Stepper Value="item.Count" Min="1" Max="item.MaxStack" ShowMax="true" Disabled="!canEdit"
+                                     Chips="StackChips(item.MaxStack)" OnCommit="v => SetCount(sel.Ref, item, v)" />
+                        </div>
+                    }
+                    @if (item.Level is { } level)
+                    {
+                        <div class="field level">
+                            <label>Level</label>
+                            <Stepper Value="level" Min="1" Max="InventoryLayout.MaxItemLevel" ShowMax="true" Disabled="!canEdit"
+                                     OnCommit="v => SetLevel(sel.Ref, level, v)" />
+                        </div>
+                    }
+                    @if (item.HasRarity)
+                    {
+                        <div class="field rarity">
+                            <label>Rarity</label>
+                            <select value="@item.Rarity" disabled="@(!canEdit)" @onchange="e => SetRarity(sel.Ref, item, e)">
+                                @foreach (var r in Enum.GetValues<Rarity>())
+                                {
+                                    <option value="@r">@r</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    @if (item.Durability is { } current && item.MaxDurability is { } max)
+                    {
+                        <div class="field durability">
+                            <label>Durability</label>
+                            <span class="pair">
+                                <NumberField Value="current" Min="0" Max="max" Disabled="!canEdit" OnCommit="v => SetDurability(sel.Ref, current, max, (uint)v, max)" />
+                                <span class="muted">/</span>
+                                <NumberField Value="max" Min="1" Max="uint.MaxValue" Disabled="!canEdit"
+                                             OnCommit="v => SetDurability(sel.Ref, current, max, Math.Min(current, (uint)v), (uint)v)" />
+                            </span>
+                        </div>
+                    }
+                    @if (sel.Ref.Kind == ContainerKind.Equipped)
+                    {
+                        <p class="note">To take it off, drag an item that fits onto it: the two swap places.</p>
+                    }
+                    else
+                    {
+                        <button class="btn danger remove" disabled="@(!canMove)" title="@moveOff" @onclick="() => Remove(sel.Ref)">Remove from backpack</button>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="ph"><h4>Selected</h4></div>
+                <p class="muted">Select an item to change it. Drag a stack to move it; drop an item on an equipped one it fits to swap them.</p>
+            }
+        </aside>
+    </div>
+
+    @if (_adding)
+    {
+        <AddItemDialog Target="_addTarget" OnAdded="Added" OnClose="() => _adding = false" />
+    }
+}
+
+@code {
+    /// <summary>Where each Equipped position sits around the figure: armour on the left, rings, shield, hook and glider on
+    /// the right, the backpack under the figure. Indices are <see cref="InventoryLayout.EquipPositions"/>.</summary>
+    private static readonly Dictionary<int, (int Row, int Col)> GearCells = new()
+    {
+        [5] = (1, 1), [6] = (2, 1), [7] = (3, 1), [8] = (4, 1), [9] = (5, 1),
+        [10] = (1, 3), [11] = (2, 3), [12] = (3, 3), [13] = (4, 3), [14] = (5, 3),
+        [15] = (6, 2),
+    };
+
+    private ItemRef? _selected;
+    private ItemRef? _drag;
+    private string? _error;
+    private bool _adding;
+    private ItemRef? _addTarget;
+
+    protected override void OnInitialized() => EditorService.Changed += OnChanged;
+
+    /// <summary>Any change (an accepted edit here or elsewhere, undo, reload, restore) drops the last refusal's message.</summary>
+    private void OnChanged()
+    {
+        _error = null;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => EditorService.Changed -= OnChanged;
+
+    private static EquipPosition Position(SlotView slot) => InventoryLayout.EquipPositions[slot.Ref.Slot];
+
+    private static (int Row, int Col) GearCell(EquipPosition p) => GearCells.GetValueOrDefault(p.Index, (7, 2));
+
+    /// <summary>"Helmet appearance" under the Appearance heading reads "Helmet".</summary>
+    private static string? Short(string? label) =>
+        label is not null && label.EndsWith(" appearance", StringComparison.Ordinal) ? label[..^" appearance".Length] : label;
+
+    private static IReadOnlyList<(string, long)> StackChips(int max) => [("1", 1), ("Half", (max + 1) / 2), ("Max", max)];
+
+    private SlotView? SelectedSlot(SessionView s) =>
+        _selected is { } r
+            ? s.Equipped.Concat(s.Backpack).Concat(s.Hotbar).Concat(s.Overflow).FirstOrDefault(x => x.Ref == r && x.Item is not null)
+            : null;
+
+    private RenderFragment Slot(SlotView slot, bool canMove, string? moveOff, string? caption = null, string? key = null, string? cls = null) =>
+        @<ItemSlot Slot="slot" Selected="@(slot.Ref == _selected)" CanDrag="canMove" CanAdd="canMove" AddTitle="@moveOff"
+                   EmptyIcon="@(slot.Ref.Kind == ContainerKind.Equipped ? AssetUrls.PositionIcon(Position(slot)) : null)"
+                   Caption="@caption" Key="@key" Class="@cls"
+                   OnSelect="() => Select(slot.Ref)" OnAdd="() => OpenAdd(slot.Ref)"
+                   OnDragStart="() => _drag = slot.Ref" OnDragEnd="() => _drag = null" OnDrop="() => Drop(slot.Ref)" />;
+
+    private void Select(ItemRef r) => _selected = r;
+
+    private void OpenAdd(ItemRef? target)
+    {
+        var s = EditorService.Current;
+        if (s.ReadOnly || s.Inventory != InventoryStatus.Full)
+            return;
+        _addTarget = target;
+        _adding = true;
+    }
+
+    /// <summary>The dialog added a stack: it closes and the new stack is selected, so its count can be changed at once.</summary>
+    private void Added(ItemRef added)
+    {
+        _adding = false;
+        _selected = added;
+        _error = null;
+    }
+
+    /// <summary>A drop moves the dragged item there, or swaps it with the item there; the service refuses what it can't do.</summary>
+    private void Drop(ItemRef to)
+    {
+        var from = _drag;
+        _drag = null;
+        if (from is not { } f || f == to)
+            return;
+        if (Try(() => EditorService.MoveItem(f, to)))
+            _selected = to;
+    }
+
+    private void Remove(ItemRef r)
+    {
+        if (Try(() => EditorService.RemoveItem(r)))
+            _selected = null;
+    }
+
+    // Values already set are skipped, so no edit is refused with "Already …".
+
+    private void SetCount(ItemRef r, ItemView item, long count)
+    {
+        if (count != item.Count)
+            Try(() => EditorService.SetCount(r, (int)count));
+    }
+
+    private void SetLevel(ItemRef r, int current, long level)
+    {
+        if (level != current)
+            Try(() => EditorService.SetItemLevel(r, (int)level));
+    }
+
+    private void SetRarity(ItemRef r, ItemView item, ChangeEventArgs e)
+    {
+        if (Enum.TryParse<Rarity>(e.Value?.ToString(), out var rarity) && rarity != item.Rarity)
+            Try(() => EditorService.SetRarity(r, rarity));
+    }
+
+    private void SetDurability(ItemRef r, uint oldCurrent, uint oldMax, uint current, uint max)
+    {
+        if ((current, max) != (oldCurrent, oldMax))
+            Try(() => EditorService.SetDurability(r, current, max));
+    }
+
+    /// <summary>Runs an edit; a refusal shows its message, and an accepted edit clears the last one.</summary>
+    private bool Try(Func<SessionView> edit)
+    {
+        try
+        {
+            edit();
+            _error = null;
+            return true;
+        }
+        catch (EditRejectedException e)
+        {
+            _error = e.Message;
+            return false;
+        }
+    }
+}

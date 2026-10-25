@@ -1,0 +1,253 @@
+@* The Add item browser: categories on the left, search, rarity chips and item tiles in the middle, and what to add on
+   the right. It adds through the editor service and reports the new stack's slot, so the tab can select it. *@
+@inject EditorService EditorService
+
+@{
+    var s = EditorService.Current;
+    var matches = Matches();
+    var firstFree = ItemText.FirstFree(s);
+    var noRoom = Target is null && firstFree < 0;
+    var goesTo = Target is { } t ? ItemText.Where(s, t) : noRoom ? InventoryEditor.NoRoom : $"Backpack · first empty slot ({firstFree + 1})";
+}
+<div class="dialog-backdrop">
+    <div class="dialog panel add-dialog" role="dialog" aria-label="Add item">
+        <div class="dialog-bar">
+            <h3>Add item</h3>
+            <div class="spacer"></div>
+            <button class="btn close" @onclick="OnClose">Close</button>
+        </div>
+        <div class="add-body">
+            <nav class="cats">
+                <button class="cat @(_category is null ? "on" : "")" data-category="All" @onclick="() => PickCategory(null)">
+                    <span class="label">All</span><span class="count">@ItemText.Count(_items.Count)</span>
+                </button>
+                @foreach (var (category, count) in _categories)
+                {
+                    var c = category;
+                    <button class="cat @(c == _category ? "on" : "")" data-category="@c" @onclick="() => PickCategory(c)">
+                        <span class="label">@ItemText.Category(c)</span><span class="count">@ItemText.Count(count)</span>
+                    </button>
+                    @if (c == _category && _subs.TryGetValue(c, out var subs))
+                    {
+                        @foreach (var (sub, subCount) in subs)
+                        {
+                            var u = sub;
+                            <button class="cat subc @(u == _sub ? "on" : "")" data-sub="@u" @onclick="() => _sub = u">
+                                <span class="label">@ItemText.SubCategory(c, u)</span><span class="count">@ItemText.Count(subCount)</span>
+                            </button>
+                        }
+                    }
+                }
+            </nav>
+
+            <div class="list">
+                <div class="search"><input type="search" placeholder="Search all items…" value="@_query" @oninput="OnSearch" /></div>
+                <div class="chips rarities">
+                    @foreach (var rarity in Enum.GetValues<Rarity>())
+                    {
+                        var r = rarity;
+                        <button class="chip @ItemText.RarityColor(r) @(r == _rarityFilter ? "on" : "")" @onclick="() => ToggleRarity(r)">@r</button>
+                    }
+                </div>
+                <div class="tiles">
+                    @foreach (var item in matches.Take(Limit))
+                    {
+                        var i = item;
+                        var range = ItemText.LevelRange(i.MinLevel, i.MaxLevel);
+                        <button class="tile @(i == _picked ? "sel" : "")" data-id="@i.Id.ToString("x8", CultureInfo.InvariantCulture)"
+                                data-rarity="@i.BaseRarity" title="@i.InternalName" @onclick="() => Pick(i)">
+                            <span class="slot @ItemText.RarityClass(i.BaseRarity)"><img class="icon" src="@i.IconUrl" alt="" /></span>
+                            <span class="t">
+                                <b>@i.Name</b>
+                                @if (range.Length > 0)
+                                {
+                                    <small>@range</small>
+                                }
+                            </span>
+                        </button>
+                    }
+                </div>
+                @if (matches.Count == 0)
+                {
+                    <p class="muted">No items match.</p>
+                }
+                else if (matches.Count > Limit)
+                {
+                    <p class="muted">Showing @Limit of @ItemText.Count(matches.Count). Search or pick a category to narrow it down.</p>
+                }
+            </div>
+
+            <aside class="adding detail">
+                @if (_error is not null)
+                {
+                    <Banner Kind="error">@_error</Banner>
+                }
+                @if (_picked is { } p)
+                {
+                    var gear = p.MaxStack == 1;
+                    <div class="big">
+                        <span class="slot @ItemText.RarityClass(p.BaseRarity)"><img class="icon" src="@p.IconUrl" alt="" /></span>
+                        <div>
+                            <div class="name">@p.Name</div>
+                            <div class="sub">@SubLabel(p) · <span class="@ItemText.RarityColor(p.BaseRarity)">@p.BaseRarity</span></div>
+                        </div>
+                    </div>
+                    <div @key="p.Id">
+                        <div class="field how-many">
+                            <label>How many</label>
+                            <Stepper Value="@(gear ? 1 : _count)" Min="1" Max="p.MaxStack" ShowMax="true" Disabled="gear"
+                                     Note="@(gear ? "gear doesn't stack" : null)" OnCommit="v => _count = (int)v" />
+                        </div>
+                        @if (_fields.Level)
+                        {
+                            <div class="field level">
+                                <label>Level</label>
+                                <Stepper Value="_level" Min="1" Max="InventoryLayout.MaxItemLevel" ShowMax="true" Note="@RangeNote(p)"
+                                         OnCommit="v => _level = (int)v" />
+                            </div>
+                        }
+                        @if (_fields.Rarity)
+                        {
+                            <div class="field rarity">
+                                <label>Rarity</label>
+                                <select value="@_pickRarity" @onchange="OnRarity">
+                                    @foreach (var rarity in Enum.GetValues<Rarity>())
+                                    {
+                                        <option value="@rarity">@(rarity == p.BaseRarity ? $"{rarity} (its usual)" : rarity.ToString())</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="muted">Pick an item to add.</p>
+                }
+                <div class="field">
+                    <label>Goes to</label>
+                    <div class="sub goes-to">@goesTo</div>
+                </div>
+                <button class="btn gold add" disabled="@(_picked is null || noRoom)" @onclick="Add">Add to backpack</button>
+            </aside>
+        </div>
+    </div>
+</div>
+
+@code {
+    /// <summary>Rendering thousands of tiles at once is slow, so the list stops here.</summary>
+    private const int Limit = 120;
+
+    /// <summary>The slot to add to (a free backpack or action-bar slot), or null for the first free backpack slot.</summary>
+    [Parameter] public ItemRef? Target { get; set; }
+    /// <summary>The new stack's slot, once it is added.</summary>
+    [Parameter] public EventCallback<ItemRef> OnAdded { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private IReadOnlyList<CatalogEntryView> _items = [];
+    private List<(ItemCategory Category, int Count)> _categories = [];
+    private readonly Dictionary<ItemCategory, List<(string Sub, int Count)>> _subs = [];
+    private ItemCategory? _category;
+    private string? _sub;
+    private Rarity? _rarityFilter;
+    private string _query = "";
+
+    private CatalogEntryView? _picked;
+    private (bool Level, bool Rarity) _fields;
+    private int _count = 1;
+    private int _level = 1;
+    private Rarity _pickRarity;
+    private string? _error;
+
+    protected override void OnInitialized()
+    {
+        _items = EditorService.Catalog();
+        var counts = _items.CountBy(i => i.Category).ToDictionary();
+        _categories = ItemText.CategoryOrder.Where(counts.ContainsKey).Select(c => (c, counts[c])).ToList();
+        // Weapons split by weapon type, Equipment by slot; "Other" goes last.
+        foreach (var category in new[] { ItemCategory.Weapons, ItemCategory.Equipment })
+            _subs[category] = _items.Where(i => i.Category == category)
+                .CountBy(i => i.SubCategory)
+                .Select(g => (g.Key, g.Value))
+                .OrderBy(g => ItemText.SubCategory(category, g.Key) == ItemText.Other)
+                .ThenBy(g => ItemText.SubCategory(category, g.Key), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+    }
+
+    private List<CatalogEntryView> Matches()
+    {
+        var q = _query.Trim();
+        return _items
+            .Where(i => _category is null || i.Category == _category)
+            .Where(i => _sub is null || i.SubCategory == _sub)
+            .Where(i => _rarityFilter is null || i.BaseRarity == _rarityFilter)
+            .Where(i => q.Length == 0 || i.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || i.InternalName.Contains(q, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    private void PickCategory(ItemCategory? category)
+    {
+        _category = category;
+        _sub = null;
+    }
+
+    /// <summary>Typing searches every item ("Search all items…"); a category picked afterwards narrows the results.</summary>
+    private void OnSearch(ChangeEventArgs e)
+    {
+        _query = e.Value?.ToString() ?? "";
+        if (_query.Trim().Length > 0)
+            PickCategory(null);
+    }
+
+    private void ToggleRarity(Rarity rarity) => _rarityFilter = _rarityFilter == rarity ? null : rarity;
+
+    private void Pick(CatalogEntryView item)
+    {
+        _picked = item;
+        _error = null;
+        _count = 1;
+        _fields = EditorService.AddFields(item.Id);
+        _level = DefaultLevel(item, EditorService.Current.Level);
+        _pickRarity = item.BaseRarity;
+    }
+
+    /// <summary>The character's level clamped to the item's level range, within the levels an edit may set (1–55).</summary>
+    private static int DefaultLevel(CatalogEntryView item, int characterLevel)
+    {
+        var (lo, hi) = (Math.Min(item.MinLevel, item.MaxLevel), Math.Max(item.MinLevel, item.MaxLevel));
+        return Math.Clamp(Math.Clamp(characterLevel, lo, hi), 1, InventoryLayout.MaxItemLevel);
+    }
+
+    private static string? RangeNote(CatalogEntryView item) =>
+        item.MaxLevel <= 0 ? null : item.MinLevel >= item.MaxLevel ? $"usually {item.MaxLevel}" : $"usually {item.MinLevel}–{item.MaxLevel}";
+
+    private static string SubLabel(CatalogEntryView item) =>
+        item.SubCategory.Length > 0 && ItemText.SubCategory(item.Category, item.SubCategory) is var sub && sub != ItemText.Other
+            ? sub
+            : ItemText.Category(item.Category);
+
+    private void OnRarity(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<Rarity>(e.Value?.ToString(), out var rarity))
+            _pickRarity = rarity;
+    }
+
+    private async Task Add()
+    {
+        if (_picked is not { } p)
+            return;
+        ItemRef added;
+        try
+        {
+            (_, added) = EditorService.AddItem(p.Id, p.MaxStack == 1 ? 1 : _count, _fields.Level ? _level : null,
+                _fields.Rarity ? _pickRarity : null, Target);
+        }
+        catch (EditRejectedException e)
+        {
+            _error = e.Message;
+            return;
+        }
+        await OnAdded.InvokeAsync(added);
+    }
+}

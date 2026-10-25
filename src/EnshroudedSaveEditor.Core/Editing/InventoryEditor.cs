@@ -26,9 +26,15 @@ public readonly record struct ItemRef(ContainerKind Kind, byte Slot);
 /// </summary>
 public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
 {
-    const string NeedsFull = "Adding and moving items isn't available for this character yet";
-    const string NoRoom = "No room in the backpack";
-    const string Unread = "Inventory couldn't be read for this character.";
+    /// <summary>Why adding, moving and removing are refused for an inventory that isn't <see cref="InventoryStatus.Full"/>.</summary>
+    public const string NeedsFull = "Adding and moving items isn't available for this character yet";
+
+    /// <summary>Why an add is refused when the backpack grid has no free slot.</summary>
+    public const string NoRoom = "No room in the backpack";
+
+    /// <summary>Why every inventory edit is refused when the inventory is <see cref="InventoryStatus.NotFound"/>.</summary>
+    public const string Unread = "Inventory couldn't be read for this character.";
+
     const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
     const string EmptySlot = "There's no item in that slot.";
     const int BackpackPosition = 15;

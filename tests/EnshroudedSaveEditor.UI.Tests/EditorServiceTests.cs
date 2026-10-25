@@ -372,6 +372,26 @@ public sealed class EditorServiceTests : IDisposable
     }
 
     [Fact]
+    public void AddFields_tell_which_fields_an_added_record_gets()
+    {
+        var e = Start();
+        e.Open(C(2));
+        const uint torch = 0xcf128197;                                        // character2 has one: a level, no rarity
+
+        Assert.Equal((false, false), e.AddFields(CopperOre));
+        Assert.Equal((true, true), e.AddFields(WolfsSnarlLongbow));
+        Assert.Equal((true, false), e.AddFields(torch));
+        Assert.Equal((false, false), e.AddFields(0xdeadbeef));
+        Assert.Equal((false, false), e.AddFields(_game.Items.All.First(i => i.Category == ItemCategory.Customization).Id));
+        Assert.Empty(e.Current.Pending);                                      // nothing changes
+        var (bow, at) = e.AddItem(WolfsSnarlLongbow, 1, 20, Rarity.Rare, null);
+        Assert.Equal((20, true), (ItemAt(bow, at).Level, ItemAt(bow, at).HasRarity));
+        var (torchView, torchAt) = e.AddItem(torch, 1, 1, null, null);
+        Assert.Equal((1, false), (ItemAt(torchView, torchAt).Level, ItemAt(torchView, torchAt).HasRarity));
+        Assert.Equal("Weapon_T1_2H_BowEpic_02", e.Catalog().Single(c => c.Id == WolfsSnarlLongbow).InternalName);
+    }
+
+    [Fact]
     public void Inventory_edits_log_one_line_each()
     {
         var e = Start();

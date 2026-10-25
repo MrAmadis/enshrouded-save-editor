@@ -326,11 +326,28 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
             return _catalog ??= Data.Items.All
                 .Where(i => i.Category != ItemCategory.Customization)
                 .Select(i => new CatalogEntryView(i.Id, i.Name, i.Category, SubCategory(i), i.BaseRarity, MaxStack(i), i.MinLevel,
-                    i.MaxLevel, icons.ItemIcon(i.Id, i)))
+                    i.MaxLevel, icons.ItemIcon(i.Id, i), i.InternalName))
                 .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(c => c.Id)
                 .ToList()
                 .AsReadOnly();
+    }
+
+    /// <summary>
+    /// Whether a stack of <paramref name="itemId"/> added now would get a level and a rarity field. The field set comes
+    /// from a record already in this save (<see cref="NewItemFields.Create"/>), so the Add item panel offers only the
+    /// fields <see cref="AddItem"/> can set. Changes nothing; false for an unknown or Customization item.
+    /// </summary>
+    public (bool Level, bool Rarity) AddFields(uint itemId)
+    {
+        lock (_lock)
+        {
+            var session = Session;
+            if (Data.Items.Find(itemId) is not { } info || info.Category == ItemCategory.Customization)
+                return (false, false);
+            var rec = NewItemFields.Create(info, 0, 1, null, null, session.Player, Data.Items);
+            return (rec.Level is not null, rec.Rarity is not null);
+        }
     }
 
     // Skills (always under the game's rules: linked to a learned node or a Spark, and paid for)

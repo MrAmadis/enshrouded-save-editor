@@ -1,0 +1,69 @@
+@* One inventory slot. An item shows its icon on its rarity tint, with a count badge for a stack; an empty Equipped
+   position shows the position's glyph; any other free slot (empty or a ghost) shows a faint "+" that opens Add item.
+   Every slot is a drop target: the editor service decides what a drop may do. *@
+
+@if (Slot.Item is { } item)
+{
+    <button type="button" class="slot @ItemText.RarityClass(item.Rarity) @(Selected ? "sel" : "") @Class" data-ref="@ItemText.Ref(Slot.Ref)"
+            data-label="@Slot.Label" title="@Tooltip(item)" draggable="@(CanDrag ? "true" : "false")"
+            @onclick="OnSelect" @ondragstart="OnDragStart" @ondragend="OnDragEnd" @ondragover:preventDefault="true" @ondrop="OnDrop">
+        <img class="icon" src="@item.IconUrl" alt="" draggable="false" />
+        @Marks()
+        @if (ItemText.IsStack(item))
+        {
+            <span class="n">@item.Count</span>
+        }
+    </button>
+}
+else if (EmptyIcon is not null)
+{
+    <div class="slot empty @Class" data-ref="@ItemText.Ref(Slot.Ref)" data-label="@Slot.Label" title="@Slot.Label"
+         @ondragover:preventDefault="true" @ondrop="OnDrop">
+        <img class="icon" src="@EmptyIcon" alt="" draggable="false" />
+        @Marks()
+    </div>
+}
+else
+{
+    <button type="button" class="slot empty addslot @Class" data-ref="@ItemText.Ref(Slot.Ref)" data-label="@Slot.Label"
+            title="@(CanAdd ? "Add an item here" : AddTitle)" disabled="@(!CanAdd)"
+            @onclick="OnAdd" @ondragover:preventDefault="true" @ondrop="OnDrop">
+        <span class="plus">+</span>
+        @Marks()
+    </button>
+}
+
+@code {
+    [Parameter, EditorRequired] public SlotView Slot { get; set; } = default!;
+    [Parameter] public bool Selected { get; set; }
+    /// <summary>Whether the item may be dragged (an inventory that allows moves, in a writable save).</summary>
+    [Parameter] public bool CanDrag { get; set; }
+    /// <summary>Whether the free slot's "+" opens Add item; <see cref="AddTitle"/> says why not.</summary>
+    [Parameter] public bool CanAdd { get; set; }
+    [Parameter] public string? AddTitle { get; set; }
+    /// <summary>For an empty Equipped position: its glyph, shown instead of the "+" (new items go into the backpack).</summary>
+    [Parameter] public string? EmptyIcon { get; set; }
+    /// <summary>The action-bar key in the top left corner.</summary>
+    [Parameter] public string? Key { get; set; }
+    /// <summary>The caption under the slot (an Equipped position's name).</summary>
+    [Parameter] public string? Caption { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public EventCallback OnSelect { get; set; }
+    [Parameter] public EventCallback OnAdd { get; set; }
+    [Parameter] public EventCallback OnDragStart { get; set; }
+    [Parameter] public EventCallback OnDragEnd { get; set; }
+    [Parameter] public EventCallback OnDrop { get; set; }
+
+    private static string Tooltip(ItemView item) => ItemText.IsStack(item) ? $"{item.Name} ×{item.Count}" : item.Name;
+
+    private RenderFragment Marks() => @<text>
+        @if (Key is not null)
+        {
+            <span class="k">@Key</span>
+        }
+        @if (Caption is not null)
+        {
+            <span class="lbl">@Caption</span>
+        }
+    </text>;
+}

@@ -72,6 +72,7 @@ public sealed record SessionView(
 /// <param name="SubCategory">The weapon type for Weapons ("RangedBow"; "" when it has none), the <see cref="EquipSlot"/>
 /// name for Equipment ("Helmet"; "None" for backpacks, wards and appearance pieces), and "" otherwise.</param>
 /// <param name="MaxStack">1 to 65535, as AddItem allows.</param>
+/// <param name="InternalName">The game's own name ("Weapon_T1_2H_BowEpic_02"), which the browser's search also covers.</param>
 public sealed record CatalogEntryView(
     uint Id, string Name, ItemCategory Category, string SubCategory, Rarity BaseRarity, int MaxStack, int MinLevel, int MaxLevel,
-    string IconUrl);
+    string IconUrl, string InternalName);
