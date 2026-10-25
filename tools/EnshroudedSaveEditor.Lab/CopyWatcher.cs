@@ -7,8 +7,56 @@ namespace EnshroudedSaveEditor.Lab;
 /// Snapshots every registered Lab copy whose bytes changed since the last poll into
 /// out/stem/yyyyMMdd-HHmmss.ksd. Reads copies; writes only new files under the out folder.
 /// </summary>
-public sealed class CopyWatcher(LabCopyRegistry registry, string outDir)
+public sealed class CopyWatcher
 {
+    readonly LabCopyRegistry registry;
+    readonly string outDir;
+
+    /// <summary>
+    /// Rule: outDir must not be a Steam/Saved Games save location, nor equal to or below any folder
+    /// that holds a registered copy or a character*.ksd file.
+    /// </summary>
+    public CopyWatcher(LabCopyRegistry registry, string outDir)
+    {
+        this.registry = registry;
+        this.outDir = outDir;
+        EnsureSafeOutDir(registry, outDir);
+    }
+
+    public static void EnsureSafeOutDir(LabCopyRegistry registry, string outDir)
+    {
+        var full = Path.GetFullPath(outDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string Refuse() => $"Refusing --out {outDir}: it is a save folder or inside one.";
+        var norm = full.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var sep = Path.DirectorySeparatorChar;
+        if (norm.Contains($"{sep}userdata{sep}", StringComparison.OrdinalIgnoreCase)
+            || norm.Contains($"{sep}1203620{sep}", StringComparison.OrdinalIgnoreCase)
+            || norm.Contains($"{sep}Saved Games{sep}Enshrouded{sep}", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(Refuse());
+
+        foreach (var e in registry.List())
+        {
+            var dir = Path.GetDirectoryName(e.Path);
+            if (dir is not null && IsSameOrUnder(full, dir)) throw new InvalidOperationException(Refuse());
+        }
+        for (var d = full; d is not null; d = Path.GetDirectoryName(d))
+        {
+            try
+            {
+                if (Directory.Exists(d) && Directory.EnumerateFiles(d, "character*.ksd").Any())
+                    throw new InvalidOperationException(Refuse());
+            }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+
+    static bool IsSameOrUnder(string path, string dir)
+    {
+        dir = dir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return path.Equals(dir, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(dir + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
     readonly Dictionary<string, string> _seen = new(StringComparer.OrdinalIgnoreCase);
 
     public IReadOnlyList<string> Poll(DateTime now)

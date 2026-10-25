@@ -88,7 +88,7 @@ public class CopyTests : IDisposable
     public void Watch_copies_changed_copies_only_once_per_change()
     {
         var path = CharacterCopier.Copy(tmp, "character1.ksd", "X", reg);
-        var outDir = Path.Combine(tmp, "out");
+        var outDir = Path.Combine(Path.GetTempPath(), "lab-out-" + Guid.NewGuid().ToString("N"));
         var watcher = new CopyWatcher(reg, outDir);
         var t0 = new DateTime(2026, 1, 2, 3, 4, 5);
         Assert.Single(watcher.Poll(t0));
@@ -100,5 +100,19 @@ public class CopyTests : IDisposable
         Assert.Single(made);
         Assert.Equal(Path.Combine(outDir, "character3", "20260102-030409.ksd"), made[0]);
         Assert.Equal(File.ReadAllBytes(path), File.ReadAllBytes(made[0]));
+    }
+
+    [Fact]
+    public void Watch_refuses_save_like_out_folders_and_accepts_a_normal_one()
+    {
+        var path = CharacterCopier.Copy(tmp, "character1.ksd", "X", reg);
+        Assert.Throws<InvalidOperationException>(() => new CopyWatcher(reg, tmp));
+        Assert.Throws<InvalidOperationException>(() => new CopyWatcher(reg, Path.Combine(tmp, "backup")));
+        Assert.Throws<InvalidOperationException>(() => new CopyWatcher(reg, Path.Combine(tmp, "a", "b")));
+        var steam = Path.Combine(Path.GetTempPath(), "x-" + Guid.NewGuid().ToString("N"), "userdata", "1", "1203620", "remote", "backup");
+        Assert.Throws<InvalidOperationException>(() => new CopyWatcher(reg, steam));
+        var ok = Path.Combine(Path.GetTempPath(), "lab-ok-" + Guid.NewGuid().ToString("N"));
+        _ = new CopyWatcher(reg, ok);
+        Assert.False(Directory.Exists(ok));
     }
 }
