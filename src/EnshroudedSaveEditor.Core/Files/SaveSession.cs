@@ -66,6 +66,10 @@ public sealed class SaveSession
         ChangeCount = snapshot.ChangeCount;
     }
 
+    /// <summary>
+    /// Reads the character. An unsupported version or a checksum mismatch opens it read-only (with the reason); a container
+    /// or record that can't be read throws <see cref="KsdFormatException"/> with what is wrong.
+    /// </summary>
     public static SaveSession Open(string path, Func<uint, bool> isItem)
     {
         var bytes = System.IO.File.ReadAllBytes(path);
@@ -86,31 +90,12 @@ public sealed class SaveSession
         var pc = file.Find(PlayerSection) ?? throw new KsdFormatException("The save has no player_character section.");
         var kn = file.Find(KnowledgeSection);
 
-        byte[] cdBytes, pcBytes;
-        byte[]? knBytes = null;
-        CharacterData character;
-        PlayerCharacter player;
-        PlayerKnowledge knowledge;
-        try
-        {
-            cdBytes = cd.GetData();
-            pcBytes = pc.GetData();
-            character = CharacterData.Parse(cdBytes);
-            player = PlayerCharacter.Parse(pcBytes, isItem);
-            if (kn is not null)
-            {
-                knBytes = kn.GetData();
-                knowledge = PlayerKnowledge.Parse(knBytes);
-            }
-            else
-            {
-                knowledge = PlayerKnowledge.Parse([100, 0, 0, 0, 0, 0, 0, 0]);
-            }
-        }
-        catch (KsdFormatException e)
-        {
-            throw new KsdFormatException($"Cannot read this character: {e.Message}");
-        }
+        var cdBytes = cd.GetData();
+        var pcBytes = pc.GetData();
+        var character = CharacterData.Parse(cdBytes);
+        var player = PlayerCharacter.Parse(pcBytes, isItem);
+        var knBytes = kn?.GetData();
+        var knowledge = PlayerKnowledge.Parse(knBytes ?? [100, 0, 0, 0, 0, 0, 0, 0]);
 
         var reason = problems.Count == 0 ? null : "Opened read-only: " + string.Join("; ", problems) + ".";
         return new SaveSession(path, file, hash, character, player, knowledge, cdBytes, pcBytes, knBytes, reason, isItem);

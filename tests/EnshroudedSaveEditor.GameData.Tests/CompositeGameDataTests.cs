@@ -56,6 +56,27 @@ public class CompositeGameDataTests
     }
 
     [Fact]
+    public void A_piece_no_source_knows_is_not_named()
+    {
+        // The install has no XP table and the reference's is null: the install gives everything there is.
+        var reference = ReferenceGameData.Load();
+        var g = new CompositeGameData(new AllButXp("Install", reference), reference);
+        Assert.Null(g.XpPerLevel);
+        Assert.Equal("Install", g.Source);
+    }
+
+    /// <summary>Every piece of <paramref name="data"/> but the XP table, which it hasn't.</summary>
+    sealed class AllButXp(string source, IGameData data) : IGameData
+    {
+        public IItemCatalog Items => data.Items;
+        public SkillGraph Tree => data.Tree;
+        public IReadOnlyDictionary<uint, SkillReward> Rewards => data.Rewards;
+        public int LevelCap => data.LevelCap;
+        public IReadOnlyList<uint>? XpPerLevel => throw new NotSupportedException("XP table");
+        public string Source => source;
+    }
+
+    [Fact]
     public void A_piece_neither_has_throws()
     {
         var g = new CompositeGameData(new Partial("A"), new Partial("B"));

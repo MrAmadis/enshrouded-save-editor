@@ -40,16 +40,18 @@ public sealed class CompositeGameData : IGameData
         _levelCap = Take("level cap", g => g.LevelCap);
         _xp = Take("XP table", g => g.XpPerLevel);
 
-        var pieces = new (string Name, IGameData? From)[]
+        var pieces = new List<(string Name, IGameData? From)>
         {
             (_items.Name, _items.From), (_tree.Name, _tree.From), (_rewards.Name, _rewards.From),
-            (_levelCap.Name, _levelCap.From), (_xp.Name, _xp.From),
+            (_levelCap.Name, _levelCap.From),
         };
+        // A null XP table means "unknown": it isn't named as coming from anywhere.
+        if (_xp.From is null || _xp.Value is not null) pieces.Add((_xp.Name, _xp.From));
         var groups = new[] { primary, fallback }
             .Select(g => (g.Source, Names: pieces.Where(p => p.From == g).Select(p => p.Name).ToList()))
             .Where(x => x.Names.Count > 0)
             .ToList();
-        Source = groups is [var only] && only.Names.Count == pieces.Length
+        Source = groups is [var only] && only.Names.Count == pieces.Count
             ? only.Source
             : string.Join("; ", groups.Select(x => $"{x.Source}: {string.Join(", ", x.Names)}"));
     }
@@ -60,6 +62,9 @@ public sealed class CompositeGameData : IGameData
     public int LevelCap => _levelCap.Get();
     public IReadOnlyList<uint>? XpPerLevel => _xp.Get();
 
-    /// <summary>The source of every piece, or which pieces came from where ("Your Enshrouded install: items, …; Reference data (…): XP table").</summary>
+    /// <summary>
+    /// The source of every piece, or which pieces came from where ("Your Enshrouded install: items, …; Reference data (…):
+    /// rewards"). A null XP table (unknown) isn't named.
+    /// </summary>
     public string Source { get; }
 }

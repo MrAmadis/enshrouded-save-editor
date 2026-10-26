@@ -190,6 +190,27 @@ public sealed class EditorServiceTests : IDisposable
     }
 
     [Fact]
+    public void Unsaved_edits_count_what_closing_the_window_would_drop()
+    {
+        var e = Start();
+        Assert.Equal(0, e.UnsavedEdits);                                  // nothing open
+        e.Open(C(2));
+        Assert.Equal(0, e.UnsavedEdits);
+
+        e.SetLevel(10);
+        e.SetName("Other");
+        Assert.Equal(2, e.UnsavedEdits);
+        e.Undo();
+        Assert.Equal(1, e.UnsavedEdits);
+
+        Assert.Equal(SaveResult.Saved, e.Save());
+        Assert.Equal(0, e.UnsavedEdits);
+        e.SetLevel(11);
+        e.Close();
+        Assert.Equal(0, e.UnsavedEdits);
+    }
+
+    [Fact]
     public void Edit_rejections_carry_the_message()
     {
         var e = Start();
@@ -261,6 +282,27 @@ public sealed class EditorServiceTests : IDisposable
         Assert.Empty(restored.Pending);
         Assert.Equal(2, e.Backups().Count);
         Assert.Equal(File.ReadAllBytes(Path.Combine(Fixtures.RealRemote, "character2.ksd")), File.ReadAllBytes(C(2)));
+    }
+
+    [Fact]
+    public void A_save_the_records_cant_express_is_refused_and_writes_nothing()
+    {
+        var e = Start();
+        e.Open(C(2));
+        e.SetLevel(10);
+        var before = File.ReadAllBytes(C(2));
+        var equipped = e.OpenSession!.Player.Container(ContainerKind.Equipped)!.Records;
+        var slot = equipped[1].Slot;
+        equipped[1].Slot = equipped[0].Slot;                               // PlayerCharacter.ToBytes refuses this
+
+        var ex = Rejected(() => e.Save());
+
+        Assert.Equal("Couldn't save these edits: Equipped slots must be in increasing order.", ex.Message);
+        Assert.Equal(before, File.ReadAllBytes(C(2)));
+        equipped[1].Slot = slot;
+        Assert.Equal(["Level 7 → 10"], e.Current.Pending);
+        Assert.Equal(SaveResult.Saved, e.Save());
+        Assert.Equal(10, Start().Open(C(2)).Level);
     }
 
     // Review fix 1: after a failed save, undoing back to the opened state and saving must write that state.
@@ -678,8 +720,7 @@ public sealed class EditorServiceTests : IDisposable
 
         var ex = Rejected(() => e.Open(listed.Path));
 
-        Assert.StartsWith("This character couldn't be opened: ", ex.Message);
-        Assert.Contains("too short", ex.Message);
+        Assert.Equal("This character couldn't be opened: player_character is too short.", ex.Message);
         Assert.False(e.IsOpen);
         e.Open(C(2));
         Rejected(() => e.Open(listed.Path));

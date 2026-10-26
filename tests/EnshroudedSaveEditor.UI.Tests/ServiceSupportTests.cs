@@ -75,7 +75,13 @@ public sealed class ServiceSupportTests : IDisposable
         Directory.CreateDirectory(game);
         foreach (var f in new[] { "enshrouded.exe", "enshrouded.kfc", "enshrouded.kfc_resources" })
             File.WriteAllText(Path.Combine(game, f), "not game data");
-        Assert.Same(ReferenceGameData.Load(), GameDataProvider.Load(GameInstall.Find(game), Path.Combine(_dir, "cache")));
+        var data = GameDataProvider.Load(GameInstall.Find(game), Path.Combine(_dir, "cache"));
+        var reference = ReferenceGameData.Load();
+        Assert.Same(reference.Items, data.Items);
+        Assert.Same(reference.Tree, data.Tree);
+        Assert.Same(reference.Rewards, data.Rewards);
+        Assert.Equal((reference.LevelCap, reference.XpPerLevel), (data.LevelCap, data.XpPerLevel));
+        Assert.Equal("Reference data (Kimikozi, build of 2026-10-15). Your Enshrouded install couldn't be read.", data.Source);
     }
 
     [Fact]
@@ -85,6 +91,6 @@ public sealed class ServiceSupportTests : IDisposable
         Assert.SkipWhen(install is null, "Enshrouded is not installed");
         var data = GameDataProvider.Load(install, Path.Combine(_dir, "cache"));
         Assert.IsType<CompositeGameData>(data);
-        Assert.StartsWith("Your Enshrouded install", data.Source);
+        Assert.Equal("Your Enshrouded install", data.Source);
     }
 }

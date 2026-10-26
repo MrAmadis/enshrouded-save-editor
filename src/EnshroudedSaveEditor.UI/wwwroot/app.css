@@ -155,6 +155,7 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .chip { padding: 3px 9px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 11px; color: var(--dim); background: transparent; font-family: inherit; cursor: pointer; }
 .chip:disabled { opacity: .45; cursor: default; }
 .chip-problem { border-color: var(--danger-line); color: var(--danger); cursor: default; }
+.data-source { margin: 28px 0 0; font-size: 12px; }
 
 /* Editor frame */
 .editor { min-height: 100vh; display: flex; flex-direction: column; }

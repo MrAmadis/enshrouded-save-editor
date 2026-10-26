@@ -162,7 +162,7 @@
         {
             SaveResult.Saved => ("info", "Saved. Backup kept."),
             SaveResult.GameRunning => ("warn", "Enshrouded is running. Close it to save."),
-            SaveResult.ChangedOnDisk => ("error", "The file changed since you opened it."),
+            SaveResult.ChangedOnDisk => ("error", "The file changed since you opened it. Reload reads it again and drops your unsaved edits."),
             SaveResult.VerifyFailed => ("error", "Save check failed; your file was restored from the backup."),
             _ => ("error", $"This save is read-only: {EditorService.Current.ReadOnlyReason}"),
         };

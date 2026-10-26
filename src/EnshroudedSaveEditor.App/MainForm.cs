@@ -13,6 +13,7 @@ namespace EnshroudedSaveEditor.App;
 internal sealed class MainForm : Form
 {
     private readonly KfcIconTextures? _iconTextures;
+    private readonly EditorService _editor;
 
     public MainForm()
     {
@@ -35,7 +36,8 @@ internal sealed class MainForm : Form
         services.AddSingleton(game);
         services.AddSingleton(icons);
         services.AddSingleton<IAssetUrls>(new IconAssets(icons, game));
-        services.AddSingleton(new EditorService(options, game, icons));
+        _editor = new EditorService(options, game, icons);
+        services.AddSingleton(_editor);
 
         var view = new BlazorWebView
         {
@@ -53,6 +55,18 @@ internal sealed class MainForm : Form
                 IconAssets.IconsHost, options.IconCacheRoot, CoreWebView2HostResourceAccessKind.Allow);
         };
         Controls.Add(view);
+    }
+
+    /// <summary>Asks before closing drops unsaved edits, as the editor's Back button does.</summary>
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        var edits = _editor.UnsavedEdits;
+        if (edits > 0 && MessageBox.Show(this,
+                $"Close the editor and drop {edits} unsaved {(edits == 1 ? "edit" : "edits")}?",
+                "Enshrouded Save Editor", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+            e.Cancel = true;
+        base.OnFormClosing(e);
     }
 
     protected override void Dispose(bool disposing)

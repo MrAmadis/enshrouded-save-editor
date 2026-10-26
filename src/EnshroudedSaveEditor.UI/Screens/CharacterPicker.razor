@@ -63,6 +63,8 @@
             }
         </div>
     }
+
+    <p class="muted data-source">Game data: @_dataSource</p>
 </div>
 
 @code {
@@ -70,6 +72,7 @@
     private bool _savesFound = true;
     private bool _running;
     private string? _error;
+    private string _dataSource = "";
 
     protected override void OnInitialized()
     {
@@ -88,6 +91,7 @@
         _savesFound = EditorService.SavesFound;
         _characters = EditorService.Characters();
         _running = EditorService.GameRunning();
+        _dataSource = EditorService.DataSource;
     }
 
     /// <summary>"Steam" for a Steam remote folder, "Local" for Saved Games\keen games, otherwise null.</summary>

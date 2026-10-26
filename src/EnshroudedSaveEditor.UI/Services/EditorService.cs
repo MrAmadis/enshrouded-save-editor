@@ -68,6 +68,16 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         }
     }
 
+    /// <summary>The open character's unsaved edits (0 when none is open): what closing the window would drop.</summary>
+    public int UnsavedEdits
+    {
+        get
+        {
+            lock (_lock)
+                return _session is null ? 0 : _log.Count;
+        }
+    }
+
     private SaveSession Session => _session ?? throw new InvalidOperationException("No character is open.");
 
     /// <summary>Tests only: the open session (e.g. to force a verify failure).</summary>
@@ -83,6 +93,9 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
     private IGameData Data => game.Data;
 
     private bool IsItem(uint id) => Data.Items.Find(id) is not null;
+
+    /// <summary>Where the game data comes from (<see cref="GameDataProvider.Source"/>), shown on the picker.</summary>
+    public string DataSource => game.Source;
 
     /// <summary>Whether any saves folder exists (the picker offers "Choose saves folder" when none does).</summary>
     public bool SavesFound => Roots().Any(Directory.Exists);
@@ -160,7 +173,8 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
 
     /// <summary>
     /// Writes the edits after a backup (<see cref="SaveSession.Save"/>). Only <see cref="SaveResult.Saved"/> clears the
-    /// pending edits and the undo history; every other result leaves the session as it was.
+    /// pending edits and the undo history; every other result leaves the session as it was. A save that can't be written,
+    /// or records the save can't hold, is refused with <see cref="EditRejectedException"/>.
     /// </summary>
     public SaveResult Save()
     {
@@ -175,6 +189,11 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
                 throw new EditRejectedException($"Couldn't write the save: {e.Message}");
+            }
+            catch (InvalidOperationException e)
+            {
+                // The records can't be written as they stand (PlayerCharacter.ToBytes); only the backup was written.
+                throw new EditRejectedException($"Couldn't save these edits: {e.Message}");
             }
             if (result == SaveResult.Saved)
             {

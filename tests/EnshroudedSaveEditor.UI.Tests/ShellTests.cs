@@ -1,6 +1,7 @@
 using Bunit;
 using EnshroudedSaveEditor.Core.Files;
 using EnshroudedSaveEditor.Core.Editing;
+using EnshroudedSaveEditor.Core.Records;
 using EnshroudedSaveEditor.GameData;
 using EnshroudedSaveEditor.UI;
 using EnshroudedSaveEditor.UI.Components;
@@ -57,6 +58,15 @@ public sealed class ShellTests : IDisposable
         Assert.Contains("character1.ksd", cut.Markup);
         Assert.Contains("69 points to spend", cut.Find("[data-file='character1.ksd']").TextContent);
         Assert.Empty(cut.FindAll(".chip-problem"));
+    }
+
+    [Fact]
+    public void Picker_says_where_the_game_data_comes_from()
+    {
+        Start();
+        var cut = _ctx.Render<CharacterPicker>();
+
+        Assert.Equal("Game data: Reference data (Kimikozi, build of 2026-10-15)", cut.Find(".data-source").TextContent.Trim());
     }
 
     [Fact]
@@ -186,7 +196,8 @@ public sealed class ShellTests : IDisposable
 
         cut.Find("button.save").Click();
 
-        Assert.Contains("The file changed since you opened it.", cut.Find(".banner").TextContent);
+        Assert.Equal("The file changed since you opened it. Reload reads it again and drops your unsaved edits.",
+            cut.Find(".banner span").TextContent.Trim());
         cut.Find("button.reload").Click();
         Assert.Empty(editor.Current.Pending);
         Assert.Equal(18, editor.Current.Level);
@@ -205,6 +216,22 @@ public sealed class ShellTests : IDisposable
         cut.Find("button.save").Click();
 
         Assert.Equal("Save check failed; your file was restored from the backup.", cut.Find(".banner").TextContent.Trim());
+    }
+
+    [Fact]
+    public void A_save_the_records_cant_express_shows_a_banner()
+    {
+        var editor = Start();
+        editor.Open(C(2));
+        editor.SetLevel(10);
+        var equipped = editor.OpenSession!.Player.Container(ContainerKind.Equipped)!.Records;
+        equipped[1].Slot = equipped[0].Slot;
+        var cut = _ctx.Render<Editor>();
+
+        cut.Find("button.save").Click();
+
+        Assert.Equal("Couldn't save these edits: Equipped slots must be in increasing order.", cut.Find(".banner").TextContent.Trim());
+        Assert.Empty(cut.FindAll("button.reload"));
     }
 
     [Fact]
