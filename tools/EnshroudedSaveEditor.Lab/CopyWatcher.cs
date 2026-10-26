@@ -76,13 +76,9 @@ public sealed class CopyWatcher
             var dir = Path.Combine(outDir, Path.GetFileNameWithoutExtension(entry.Path));
             Directory.CreateDirectory(dir);
             var target = Path.Combine(dir, now.ToString("yyyyMMdd-HHmmss") + ".ksd");
-            try
-            {
-                using var fs = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                fs.Write(bytes);
-                made.Add(target);
-            }
-            catch (IOException) when (File.Exists(target)) { /* same-second snapshot already exists; keep it */ }
+            // A same-second snapshot already exists: keep it. A failed write leaves no partial snapshot and throws,
+            // which stops watch with the error (NewFile.TryWrite).
+            if (NewFile.TryWrite(target, fs => fs.Write(bytes))) made.Add(target);
         }
         return made;
     }

@@ -102,6 +102,32 @@ public class CopyTests : IDisposable
         Assert.Equal(File.ReadAllBytes(path), File.ReadAllBytes(made[0]));
     }
 
+    // A second change within the same second finds that second's snapshot taken: it is kept, not overwritten.
+    [Fact]
+    public void Watch_keeps_a_same_second_snapshot()
+    {
+        var path = CharacterCopier.Copy(tmp, "character1.ksd", "X", reg);
+        var outDir = Path.Combine(Path.GetTempPath(), "lab-out-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var watcher = new CopyWatcher(reg, outDir);
+            var t0 = new DateTime(2026, 1, 2, 3, 4, 5);
+            var first = Assert.Single(watcher.Poll(t0));
+            var snapshot = File.ReadAllBytes(first);
+            var f = KsdFile.Parse(File.ReadAllBytes(path));
+            f.Revision++;
+            File.WriteAllBytes(path, f.ToBytes());
+
+            Assert.Empty(watcher.Poll(t0));
+            Assert.Equal(snapshot, File.ReadAllBytes(first));
+            Assert.Single(Directory.GetFiles(Path.GetDirectoryName(first)!));
+        }
+        finally
+        {
+            try { Directory.Delete(outDir, true); } catch { }
+        }
+    }
+
     [Fact]
     public void Watch_refuses_save_like_out_folders_and_accepts_a_normal_one()
     {

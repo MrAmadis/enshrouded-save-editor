@@ -40,13 +40,9 @@ public static partial class CharacterCopier
             file.Guid = guid;
             var bytes = file.ToBytes();
 
+            // A failed write leaves no partial file and throws, rather than passing for a taken number (NewFile.TryWrite).
             var target = Path.Combine(targetDir, $"character{n}.ksd");
-            try
-            {
-                using (var fs = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None))
-                    fs.Write(bytes);
-            }
-            catch (IOException) when (File.Exists(target)) { continue; }
+            if (!NewFile.TryWrite(target, fs => fs.Write(bytes))) continue;
 
             registry.Register(target, guid);
             return target;

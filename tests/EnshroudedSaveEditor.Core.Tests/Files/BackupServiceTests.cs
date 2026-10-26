@@ -47,6 +47,30 @@ public class BackupServiceTests : IDisposable
         Assert.Equal(Key(SteamC0), Key(SteamC0.ToUpperInvariant()));
     }
 
+    // A copy that fails once the backup file exists (a full disk; here a locked byte of the source) used to pass for a
+    // name collision: the partial file stayed and the next name was tried, for as long as the copy kept failing.
+    [Fact]
+    public async Task A_backup_that_fails_while_copying_leaves_nothing_behind()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            Assert.Skip("A byte-range lock blocks other handles' reads only on Windows.");
+            return;                                                // for the platform analyzer
+        }
+        var dir = Path.Combine(_backupRoot, "character0-" + Key(LocalC0));
+        using (var hold = new FileStream(LocalC0, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        {
+            hold.Lock(0, 1);                                       // the copy's first read fails
+            var backup = Task.Run(() => Backups.Backup(LocalC0));
+            // Bounded, so a retry loop fails the test instead of hanging it.
+            await Assert.ThrowsAnyAsync<IOException>(() => backup.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken));
+        }
+        Assert.Empty(Directory.EnumerateFiles(dir));
+
+        var b = Backups.Backup(LocalC0);                            // once the source reads again, a backup works
+        Assert.Equal(File.ReadAllBytes(LocalC0), File.ReadAllBytes(b));
+    }
+
     [Fact]
     public void Restore_refuses_a_backup_from_another_folder()
     {

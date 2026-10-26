@@ -31,23 +31,21 @@ public sealed class BackupService(string backupRoot)
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(folder.ToLowerInvariant())))[..8];
     }
 
+    /// <summary>
+    /// Copies the file to a new backup and returns its path; a name already taken gets a <c>-1</c>, <c>-2</c>… suffix.
+    /// A failed copy leaves no partial backup and throws (<see cref="NewFile.TryWrite"/>).
+    /// </summary>
     public string Backup(string characterPath)
     {
         var dir = DirFor(characterPath);
         Directory.CreateDirectory(dir);
         var stamp = DateTime.Now.ToString(StampFormat, CultureInfo.InvariantCulture);
+        using var src = new FileStream(characterPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         for (var i = 0; ; i++)
         {
             var name = i == 0 ? $"{stamp}.ksd" : $"{stamp}-{i}.ksd";
             var target = Path.Combine(dir, name);
-            try
-            {
-                using var src = new FileStream(characterPath, FileMode.Open, FileAccess.Read, FileShare.Read);
-                using var dst = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                src.CopyTo(dst);
-                return target;
-            }
-            catch (IOException) when (File.Exists(target)) { }
+            if (NewFile.TryWrite(target, src.CopyTo)) return target;
         }
     }
 
