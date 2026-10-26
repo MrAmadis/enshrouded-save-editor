@@ -68,6 +68,16 @@ public static class ItemText
     public static string LevelRange(int min, int max) =>
         max <= 0 ? "" : min >= max ? $"Lv {max}" : $"Lv {min}–{max}";
 
+    /// <summary>Beside a level stepper: "levels 1–50".</summary>
+    public static string Levels(int min, int max) => $"levels {min}–{max}";
+
+    /// <summary>
+    /// Beside a fixed level (<see cref="ItemView.FixedLevel"/>): "set by the game", and when upgrades raised it past
+    /// its base, "set by the game: base 5 plus upgrades".
+    /// </summary>
+    public static string SetByGame(int baseLevel, int level) =>
+        level == baseLevel ? "set by the game" : $"set by the game: base {baseLevel} plus upgrades";
+
     /// <summary>Thousands separated, as the category counts show.</summary>
     public static string Count(int n) => n.ToString("N0", CultureInfo.InvariantCulture);
 

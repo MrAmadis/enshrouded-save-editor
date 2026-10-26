@@ -232,7 +232,9 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .stepper button { width: 34px; height: 34px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--gold-2); font-size: 16px; cursor: pointer; }
 .stepper button:disabled { opacity: .45; cursor: default; }
 .stepper .number-field input { border-left: 0; border-right: 0; height: 34px; }
-.stepper .max { align-self: center; margin-left: 10px; color: var(--muted); font-size: 12px; }
+.stepper .max, .fixed-level .max { align-self: center; margin-left: 10px; color: var(--muted); font-size: 12px; }
+.fixed-level { display: flex; align-items: center; min-height: 34px; }
+.fixed-level .value { color: var(--text); font-size: 16px; font-weight: 600; }
 .chips { display: flex; gap: 6px; margin-top: 8px; }
 
 /* Backups dialog */

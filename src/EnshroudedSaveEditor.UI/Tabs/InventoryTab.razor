@@ -122,8 +122,17 @@ else
                     {
                         <div class="field level">
                             <label>Level</label>
-                            <Stepper Value="level" Min="1" Max="InventoryLayout.MaxItemLevel" ShowMax="true" Disabled="!canEdit"
-                                     OnCommit="v => SetLevel(sel.Ref, level, v)" />
+                            @if (item.FixedLevel)
+                            {
+                                <div class="fixed-level"><span class="value">@level</span><span class="max">@ItemText.SetByGame(item.MinLevel ?? level, level)</span></div>
+                            }
+                            else
+                            {
+                                // An unknown item has no range: 1 to the gear cap.
+                                var (lo, hi) = (item.MinLevel ?? 1, item.MaxLevel ?? InventoryLayout.MaxItemLevel);
+                                <Stepper Value="level" Min="lo" Max="hi" Note="@ItemText.Levels(lo, hi)" Disabled="!canEdit"
+                                         OnCommit="v => SetLevel(sel.Ref, level, v)" />
+                            }
                         </div>
                     }
                     @if (item.HasRarity)

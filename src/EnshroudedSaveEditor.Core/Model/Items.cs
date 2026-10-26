@@ -15,7 +15,14 @@ public enum EquipSlot { None, Arms, Boots, Chest, Helmet, Legs, Ring, Shield, We
 
 public sealed record ItemInfo(
     uint Id, string Name, ItemCategory Category, Rarity BaseRarity, int MaxStack, int MinLevel, int MaxLevel,
-    EquipSlot Slot, string? WeaponType, string InternalName, string Description, int Perks, bool NoRarity);
+    EquipSlot Slot, string? WeaponType, string InternalName, string Description, int Perks, bool NoRarity)
+{
+    /// <summary>
+    /// The game sets this item's level (<see cref="MinLevel"/> equals <see cref="MaxLevel"/>, 0–0 included): its base,
+    /// <see cref="MinLevel"/>, plus the upgrades in the rarity field's second byte. It rewrites any other level.
+    /// </summary>
+    public bool FixedLevel => MinLevel == MaxLevel;
+}
 
 public interface IItemCatalog
 {

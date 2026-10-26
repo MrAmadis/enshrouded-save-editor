@@ -24,9 +24,9 @@ public static class NewItemFields
     /// shields level, durability and rarity (<c>0x13</c>, as every shield seen has durability), weapons level,
     /// durability, rarity and a gem socket (<c>0x33</c>), and everything else no fields.
     /// <para>
-    /// Where the field set has them: level is <paramref name="level"/>, or else (T10-R1b) the same-id record's own
-    /// level, or else the character's level clamped to the item's reference range (0 for a 0–0 range), capped at
-    /// <see cref="InventoryLayout.MaxItemLevel"/>; a default never changes the field set. Rarity is
+    /// Where the field set has them: level is <paramref name="level"/>, or else the character's level clamped to the
+    /// item's reference range, which is a fixed-level item's base level (0 for a 0–0 range); a default never changes
+    /// the field set. Rarity is
     /// <paramref name="rarity"/>, or else the base rarity, with the extra byte 0;
     /// durability is full, at the copied record's maximum, or for the defaults that of the first weapon record in
     /// <paramref name="pc"/> (needs <paramref name="items"/>), or else 100; the gem socket is empty. A level or
@@ -67,7 +67,7 @@ public static class NewItemFields
                 && items?.Find(r.ItemId)?.Category == ItemCategory.Weapons)?.Durability?.Max ?? 100;
         }
 
-        if ((flags & LevelBit) != 0) rec.Level = level is { } l ? (byte)l : DefaultLevel(info, pc.Level, sameId?.Level);
+        if ((flags & LevelBit) != 0) rec.Level = level is { } l ? (byte)l : DefaultLevel(info, pc.Level);
         if ((flags & DurabilityBit) != 0) rec.Durability = (durability, durability);
         if ((flags & RarityBit) != 0) rec.Rarity = ((byte)(rarity ?? info.BaseRarity), 0);
         if ((flags & GemBit) != 0) rec.Gem = (0, 0);
@@ -85,23 +85,14 @@ public static class NewItemFields
     };
 
     /// <summary>
-    /// T10-R1b, for a field set that has a level: the same-id record's own level, or else the character's level
-    /// clamped to the item's reference range (0 for a 0–0 range); capped at <see cref="InventoryLayout.MaxItemLevel"/>.
-    /// The reference range is used only here, not to bound edits.
+    /// For a field set that has a level: the character's level clamped to the item's reference range. For a
+    /// fixed-level item that is its base level, which with no upgrades is the level the game gives it
+    /// (<see cref="ItemInfo.FixedLevel"/>); a same-id record's own level may include upgrades, so it isn't copied.
     /// </summary>
-    static byte DefaultLevel(ItemInfo info, uint characterLevel, byte? sameIdLevel)
+    static byte DefaultLevel(ItemInfo info, uint characterLevel)
     {
-        int value;
-        if (sameIdLevel is { } own)
-        {
-            value = own;
-        }
-        else
-        {
-            var max = Math.Clamp(info.MaxLevel, 0, byte.MaxValue);
-            var min = Math.Clamp(info.MinLevel, 0, max);
-            value = (int)Math.Clamp(characterLevel, (uint)min, (uint)max);
-        }
-        return (byte)Math.Min(value, InventoryLayout.MaxItemLevel);
+        var max = Math.Clamp(info.MaxLevel, 0, byte.MaxValue);
+        var min = Math.Clamp(info.MinLevel, 0, max);
+        return (byte)Math.Clamp(characterLevel, (uint)min, (uint)max);
     }
 }

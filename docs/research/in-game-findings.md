@@ -71,9 +71,36 @@ In Test Slots (a character2 copy), the "Q" marker sat on Inventory slot 14, whic
 - **Equipped** (character2, 11 records): helmet, chest, arms, legs, boots, shield ("Block"), backpack, grappling hook, glider, ring, ring. Weapons live in the action bar, not in Equipped.
 - **The ammo slot** on the character screen shows a stack that stays in the inventory. Inventory slot 14 carries a "Q" marker, so ammo is a reference, not a separate record.
 
-### Still open
+## Session B — 2026-10-25
+
+### Item levels ("Try Me", `watch` captures in `local-b/character7/`)
+
+**Owner report:** bows with a level range ("1–50") take the level set in the editor. "Bow Of The Serpent" always shows its own level in-game, whatever level the editor wrote.
+
+| Capture | Record | Observation |
+|---|---|---|
+| 21:51:51 | Bow Of The Serpent `1cf81b28` (levels 21–21), Extra 2 | Written at level 22, durability 381/381. |
+| 21:54:26 | the same | The game rewrote it to level 21 and durability 356/356. |
+| 21:54:58 → 21:56:24 | `1cf81b28`, and `425f24be` (20–20, Epic) | Both written at 25; the game put them back to 21 and 20. |
+| 21:57:21 → 21:58:03 | `456ea73b` (16–16) | Written at 30; back to 16, durability 381 → 321. |
+| 21:59:05 → 22:00:01 | three Talion's Bows `9ecd0c33` (1–50) | Levels 50, 18 and 50 kept. Durability recomputed: 381 → 490, 361, 490. |
+
+What this settles:
+- **"Bow Of The Serpent" is five items** in the game data, each of a fixed level and rarity: levels 16, 21, 26 and 36 (Rare) and 20 (Epic). The "Try Me" copy held three of them.
+- **The game rewrites a written level on fixed-level gear** (min level = max level) and recomputes its durability. **Range items keep the written level**; only their durability is recomputed.
+- **In the owner's real saves, a fixed-level item's level is its base plus the rarity field's second byte,** which looks like an upgrade count: the Alchemist Apprentice set is 5 + 5 = 10, the Lesser Ring of Health 5 + 4 = 9. The one exception is character0's Hero's Shield: level 14 against base 10, with no rarity field.
+
+**Decision** (replaces T10-R1, "levels 1–55 for any record with a level field", and T10-R1b, "a new item copies a same-id record's level"):
+- **Fixed-level items:** the level isn't editable, and a new one is added at its base level (no upgrades). The Inventory tab and the Add item panel show it read-only.
+- **Ranged items:** levels within their range. A new one defaults to the character's level, clamped to the range.
+- **Items missing from the game data:** levels 1–55, as before.
+- **Upgrades** (the rarity field's second byte) aren't editable; a new item gets 0.
+- **Durability:** the game recomputes it, so the copied value is fine.
+
+## Still open
 
 - ~~The in-game name box limit~~: 15 characters (owner, above).
+- **Upgrades on ranged items.** Ranged weapons in the owner's saves often have the rarity field's second byte set too: character1's Wolf's Snarl Longbow and Bronze Sword are level 23 with 5, on a level-18 character. So their level may include upgrades as well. The editor bounds a ranged item's level by its range, so one above its max level can only be lowered. Editing upgrades needs their rules first: the maximum, and how rarity changes with them.
 - How the game accepts an edited **Steam** character, i.e. whether Steam Cloud keeps the edit. It can't be tested on a copy, because Steam never lists copies. It needs either the owner's own Save on a Steam character after the editor is finished, or a game-made Steam throwaway (owner to decide).
 - **For session B: when the game sets or clears header byte 2 (Equipped mask bits 16–18).** Until this is answered, equipping into an empty Equipped position and unequipping stay disabled in the editor. Suggested checks, each on a local copy with `watch` running:
   1. Take off **only the shield**, wait for an autosave, then put it back on. Does bit 16 clear and come back? With which u16 value?

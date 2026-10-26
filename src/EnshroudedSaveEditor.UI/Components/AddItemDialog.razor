@@ -54,15 +54,13 @@
                     {
                         var i = item;
                         var range = ItemText.LevelRange(i.MinLevel, i.MaxLevel);
+                        // Level and base rarity tell apart items of one name ("Bow Of The Serpent" is five).
                         <button class="tile @(i == _picked ? "sel" : "")" data-id="@i.Id.ToString("x8", CultureInfo.InvariantCulture)"
                                 data-rarity="@i.BaseRarity" title="@i.InternalName" @onclick="() => Pick(i)">
                             <span class="slot @ItemText.RarityClass(i.BaseRarity)"><img class="icon" src="@i.IconUrl" alt="" /></span>
                             <span class="t">
                                 <b>@i.Name</b>
-                                @if (range.Length > 0)
-                                {
-                                    <small>@range</small>
-                                }
+                                <small>@(range.Length > 0 ? $"{range} · " : "")<span class="@ItemText.RarityColor(i.BaseRarity)">@i.BaseRarity</span></small>
                             </span>
                         </button>
                     }
@@ -98,12 +96,19 @@
                             <Stepper Value="@(gear ? 1 : _count)" Min="1" Max="p.MaxStack" ShowMax="true" Disabled="gear"
                                      Note="@(gear ? "gear doesn't stack" : null)" OnCommit="v => _count = (int)v" />
                         </div>
-                        @if (_fields.Level)
+                        @if (_fields.Level is not null)
                         {
                             <div class="field level">
                                 <label>Level</label>
-                                <Stepper Value="_level" Min="1" Max="InventoryLayout.MaxItemLevel" ShowMax="true" Note="@RangeNote(p)"
-                                         OnCommit="v => _level = (int)v" />
+                                @if (p.FixedLevel)
+                                {
+                                    <div class="fixed-level"><span class="value">@_level</span><span class="max">@ItemText.SetByGame(p.MinLevel, _level)</span></div>
+                                }
+                                else
+                                {
+                                    <Stepper Value="_level" Min="p.MinLevel" Max="p.MaxLevel" Note="@ItemText.Levels(p.MinLevel, p.MaxLevel)"
+                                             OnCommit="v => _level = (int)v" />
+                                }
                             </div>
                         }
                         @if (_fields.Rarity)
@@ -153,7 +158,8 @@
     private string _query = "";
 
     private CatalogEntryView? _picked;
-    private (bool Level, bool Rarity) _fields;
+    /// <summary>The picked item's default level (null when it gets no level field) and whether it gets a rarity.</summary>
+    private (int? Level, bool Rarity) _fields;
     private int _count = 1;
     private int _level = 1;
     private Rarity _pickRarity;
@@ -208,19 +214,9 @@
         _error = null;
         _count = 1;
         _fields = EditorService.AddFields(item.Id);
-        _level = DefaultLevel(item, EditorService.Current.Level);
+        _level = _fields.Level ?? 0;
         _pickRarity = item.BaseRarity;
     }
-
-    /// <summary>The character's level clamped to the item's level range, within the levels an edit may set (1–55).</summary>
-    private static int DefaultLevel(CatalogEntryView item, int characterLevel)
-    {
-        var (lo, hi) = (Math.Min(item.MinLevel, item.MaxLevel), Math.Max(item.MinLevel, item.MaxLevel));
-        return Math.Clamp(Math.Clamp(characterLevel, lo, hi), 1, InventoryLayout.MaxItemLevel);
-    }
-
-    private static string? RangeNote(CatalogEntryView item) =>
-        item.MaxLevel <= 0 ? null : item.MinLevel >= item.MaxLevel ? $"usually {item.MaxLevel}" : $"usually {item.MinLevel}–{item.MaxLevel}";
 
     private static string SubLabel(CatalogEntryView item) =>
         item.SubCategory.Length > 0 && ItemText.SubCategory(item.Category, item.SubCategory) is var sub && sub != ItemText.Other
@@ -240,8 +236,9 @@
         ItemRef added;
         try
         {
-            (_, added) = EditorService.AddItem(p.Id, p.MaxStack == 1 ? 1 : _count, _fields.Level ? _level : null,
-                _fields.Rarity ? _pickRarity : null, Target);
+            // A fixed level is the game's to set, so none is sent: the item gets its base level.
+            var level = _fields.Level is not null && !p.FixedLevel ? _level : (int?)null;
+            (_, added) = EditorService.AddItem(p.Id, p.MaxStack == 1 ? 1 : _count, level, _fields.Rarity ? _pickRarity : null, Target);
         }
         catch (EditRejectedException e)
         {

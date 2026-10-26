@@ -378,11 +378,12 @@ public sealed class EditorServiceTests : IDisposable
         e.Open(C(2));
         const uint torch = 0xcf128197;                                        // character2 has one: a level, no rarity
 
-        Assert.Equal((false, false), e.AddFields(CopperOre));
-        Assert.Equal((true, true), e.AddFields(WolfsSnarlLongbow));
-        Assert.Equal((true, false), e.AddFields(torch));
-        Assert.Equal((false, false), e.AddFields(0xdeadbeef));
-        Assert.Equal((false, false), e.AddFields(_game.Items.All.First(i => i.Category == ItemCategory.Customization).Id));
+        Assert.Equal(((int?)null, false), e.AddFields(CopperOre));
+        Assert.Equal((7, true), e.AddFields(WolfsSnarlLongbow));             // the character's level, within 1–50
+        Assert.Equal((1, false), e.AddFields(torch));                         // fixed at 1
+        Assert.Equal((5, true), e.AddFields(AlchemistHat));                   // its base, not the worn hat's 10
+        Assert.Equal(((int?)null, false), e.AddFields(0xdeadbeef));
+        Assert.Equal(((int?)null, false), e.AddFields(_game.Items.All.First(i => i.Category == ItemCategory.Customization).Id));
         Assert.Empty(e.Current.Pending);                                      // nothing changes
         var (bow, at) = e.AddItem(WolfsSnarlLongbow, 1, 20, Rarity.Rare, null);
         Assert.Equal((20, true), (ItemAt(bow, at).Level, ItemAt(bow, at).HasRarity));

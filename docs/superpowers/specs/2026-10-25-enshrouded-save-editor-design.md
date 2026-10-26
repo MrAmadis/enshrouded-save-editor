@@ -248,6 +248,8 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
 - **Right: Selected panel.**
   - **Stack:** a stepper with typing, plus 1 / Half / Max chips. It is capped at the item's max stack from game data *(my guess, owner approved)*.
   - **Gear:** level (within the item's range), rarity and durability.
+    - **Fixed-level items** (game data min level = max level) show their level read-only. The game sets it to the base level plus upgrades and rewrites any other value (session B, `docs/research/in-game-findings.md`).
+    - An item missing from the game data takes levels 1–55.
   - **Remove from backpack.**
 - **Drag** to move or swap stacks, including onto equipped slots. Only items whose slot matches can go there.
   - **For now that is a swap only:** an item replaces the equipped item of its kind, and that item goes where the new one was. Equipping into an empty slot and unequipping change the Equipped mask, and when the game changes its byte 2 alongside isn't known yet (§10.3). Until session B settles it, they are refused with a message.
@@ -261,10 +263,11 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
   - Weapons split by weapon type; Equipment by slot.
   - Customization is left out; everything else is in, including Currency *(my call)*.
   - Counts appear beside each.
-- **Middle:** search across all items, rarity filter chips, and item tiles with icon, name and level range.
+- **Middle:** search across all items, rarity filter chips, and item tiles with icon, name, level range and base rarity. Level and rarity tell apart items that share a name ("Bow Of The Serpent" is five items).
 - **Right: Adding panel.**
   - **How many:** up to the max stack; gear is always 1.
   - **Gear:** level (default: the character's level, clamped to the item's range) and rarity (default: the item's base rarity) *(my calls)*.
+    - A fixed-level item shows its base level read-only and is added at it (session B).
   - **Goes to:** the slot that was clicked, or the first empty backpack slot: the base rows (Inventory 0–15, then 32–39), then the extension. It goes to the action bar only when that slot was clicked *(owner ruling T12-R2)*.
   - **Add to backpack.** If there's no room, it says so and adds nothing.
 - An added stack is selected straight away, so its count can be changed at once (owner).

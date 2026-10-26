@@ -17,6 +17,7 @@ public sealed class AddItemDialogTests : IDisposable
     const uint WolfsSnarlLongbow = 0x29433573;    // Weapons/RangedBow, levels 1–50
     const uint RingOfHealth = 0xf29b7aa9;         // Equipment/Ring, levels 10–10
     const uint Torch = 0xcf128197;                // Weapons; character2's own torch has a level and no rarity
+    const uint WaterPouch = 0xe4831ad8;           // levels 0–0; character1's has a level field (flags 05)
 
     readonly string _root = Fixtures.CopyToTemp();
     readonly string _appData = Path.Combine(Path.GetTempPath(), "enshrouded-appdata-" + Guid.NewGuid().ToString("N"));
@@ -94,7 +95,7 @@ public sealed class AddItemDialogTests : IDisposable
         Assert.Contains("Wolf's Snarl Longbow", names);
         var bowIds = catalog.Where(c => c.SubCategory == "RangedBow").Select(c => Id(c.Id)).Order();
         Assert.Equal(bowIds, cut.FindAll(".add-dialog .tile").Select(t => t.GetAttribute("data-id")!).Order());
-        Assert.Equal("Lv 1–50", cut.Find($".add-dialog .tile[data-id='{Id(WolfsSnarlLongbow)}'] small").TextContent.Trim());
+        Assert.Equal("Lv 1–50 · Common", cut.Find($".add-dialog .tile[data-id='{Id(WolfsSnarlLongbow)}'] small").TextContent.Trim());
 
         // Equipment expands into slots; the slotless ones show as Other
         cut.Find(".add-dialog [data-category='Equipment']").Click();
@@ -106,7 +107,10 @@ public sealed class AddItemDialogTests : IDisposable
         // The search covers every item, by name or internal name
         Search(cut, "copper ore");
         Assert.Equal(["Copper Ore"], TileNames(cut));
+        Assert.Equal("Lv 13 · Common", cut.Find(".add-dialog .tile small").TextContent.Trim());
         Assert.Contains("on", cut.Find(".add-dialog [data-category='All']").ClassList);
+        Search(cut, "limestone");
+        Assert.Equal("Common", cut.Find(".add-dialog .tile[data-id='cd603dcd'] small").TextContent.Trim());   // no level range
         Search(cut, "weapon_t1_2h_bowepic_02");
         Assert.Equal(["Wolf's Snarl Longbow"], TileNames(cut));
 
@@ -185,10 +189,12 @@ public sealed class AddItemDialogTests : IDisposable
         Assert.All(cut.FindAll(".add-dialog .how-many input, .add-dialog .how-many button"), e => Assert.True(e.HasAttribute("disabled")));
         Assert.Contains("gear doesn't stack", cut.Find(".add-dialog .how-many").TextContent);
         Assert.Equal("7", cut.Find(".add-dialog .level input").GetAttribute("value"));   // the character's level, within 1–50
-        Assert.Contains("1–50", cut.Find(".add-dialog .level").TextContent);
+        Assert.Contains("levels 1–50", cut.Find(".add-dialog .level").TextContent);
         Assert.Equal("Common", cut.Find(".add-dialog .rarity select").GetAttribute("value"));
         Assert.Equal("Common (its usual)", cut.Find(".add-dialog .rarity option[value='Common']").TextContent.Trim());
 
+        cut.Find(".add-dialog .level input").Change("51");
+        Assert.Contains("Enter a number from 1 to 50", cut.Find(".add-dialog .level").TextContent);
         cut.Find(".add-dialog .level input").Change("20");
         cut.Find(".add-dialog .rarity select").Change("Legendary");
         cut.Find(".add-dialog button.add").Click();
@@ -208,17 +214,54 @@ public sealed class AddItemDialogTests : IDisposable
 
         Search(cut, "Ring of Health");
         cut.Find($".add-dialog .tile[data-id='{Id(RingOfHealth)}']").Click();
-        Assert.Equal("10", cut.Find(".add-dialog .level input").GetAttribute("value"));   // level 7 clamped to 10–10
+        Assert.Equal("10", cut.Find(".add-dialog .level .value").TextContent.Trim());     // fixed at 10
         Assert.Equal("Uncommon", cut.Find(".add-dialog .rarity select").GetAttribute("value"));
 
         Search(cut, "Tool_Torch01");
         cut.Find($".add-dialog .tile[data-id='{Id(Torch)}']").Click();
-        Assert.Equal((true, false), editor.AddFields(Torch));
-        Assert.Equal("1", cut.Find(".add-dialog .level input").GetAttribute("value"));    // level 7 clamped to 1–1
+        Assert.Equal((1, false), editor.AddFields(Torch));
+        Assert.Equal("1", cut.Find(".add-dialog .level .value").TextContent.Trim());      // fixed at 1
         Assert.Empty(cut.FindAll(".add-dialog .rarity"));
 
         cut.Find(".add-dialog button.add").Click();
         Assert.Equal((Torch, 1), (editor.Current.Backpack[0].Item!.Id, editor.Current.Backpack[0].Item!.Level));
+    }
+
+    // Session B: "Bow Of The Serpent" is five items, each of a fixed level the game enforces.
+    [Fact]
+    public void Fixed_level_variants_show_their_own_level_and_rarity_and_add_at_it()
+    {
+        var editor = Start();
+        var cut = OpenDialog();
+        Search(cut, "Bow Of The Serpent");
+
+        Assert.Equal(["Lv 16 · Rare", "Lv 20 · Epic", "Lv 21 · Rare", "Lv 26 · Rare", "Lv 36 · Rare"],
+            cut.FindAll(".add-dialog .tile small").Select(s => s.TextContent.Trim()).Order());
+
+        cut.Find(".add-dialog .tile[data-id='1cf81b28']").Click();
+        Assert.Equal("Bows · Rare", cut.Find(".add-dialog .adding .sub").TextContent.Trim());
+        Assert.Empty(cut.FindAll(".add-dialog .level input, .add-dialog .level button"));
+        Assert.Equal("21", cut.Find(".add-dialog .level .value").TextContent.Trim());
+        Assert.Equal("set by the game", cut.Find(".add-dialog .level .max").TextContent.Trim());
+
+        cut.Find(".add-dialog button.add").Click();
+        Assert.Equal((0x1cf81b28u, 21), (editor.Current.Backpack[0].Item!.Id, editor.Current.Backpack[0].Item!.Level));
+        Assert.Equal("21", cut.Find(".detail .level .value").TextContent.Trim());
+    }
+
+    // The dialog used to send a level of at least 1 for every item, so a 0–0 item got level 1 instead of its 0.
+    [Fact]
+    public void A_0_to_0_item_is_added_at_level_0()
+    {
+        var editor = Start(1);
+        var cut = OpenDialog();
+        Search(cut, "Water Pouch");
+        cut.Find($".add-dialog .tile[data-id='{Id(WaterPouch)}']").Click();
+        Assert.Equal("0", cut.Find(".add-dialog .level .value").TextContent.Trim());
+
+        cut.Find(".add-dialog button.add").Click();
+        var added = editor.Current.Backpack.Single(s => s.Ref == new ItemRef(ContainerKind.Extra, 1)).Item!;   // its first free slot
+        Assert.Equal((WaterPouch, 0), (added.Id, added.Level));
     }
 
     [Fact]

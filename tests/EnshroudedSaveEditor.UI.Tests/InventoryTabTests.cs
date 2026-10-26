@@ -151,7 +151,7 @@ public sealed class InventoryTabTests : IDisposable
         Assert.Equal("Scorching Wand", cut.Find(".detail .name").TextContent.Trim());
         Assert.Empty(cut.FindAll(".detail .stack"));                       // gear doesn't stack
         Assert.Equal("11", cut.Find(".detail .level input").GetAttribute("value"));
-        Assert.Contains("max 55", cut.Find(".detail .level").TextContent);
+        Assert.Contains("levels 1–50", cut.Find(".detail .level").TextContent);
         Assert.Equal("Legendary", cut.Find(".detail .rarity select").GetAttribute("value"));
         var durability = cut.FindAll(".detail .durability input");
         Assert.Equal(["352", "363"], durability.Select(i => i.GetAttribute("value")));
@@ -170,9 +170,29 @@ public sealed class InventoryTabTests : IDisposable
             "Scorching Wand durability 363/363 → 300/300",
         ], editor.Current.Pending);
         Assert.Empty(cut.FindAll(".banner"));
-        cut.Find(".detail .level input").Change("55");
+        cut.Find(".detail .level input").Change("51");
+        Assert.Contains("Enter a number from 1 to 50", cut.Find(".detail .level").TextContent);
+        cut.Find(".detail .level input").Change("50");
         Assert.True(cut.Find(".detail .level button.plus").HasAttribute("disabled"));
-        Assert.Equal(55, ItemAt(editor.Current, Inv(16))!.Level);
+        Assert.Equal(50, ItemAt(editor.Current, Inv(16))!.Level);
+    }
+
+    // Session B: the game sets a fixed-level item's level (base plus upgrades), so it is shown, not edited.
+    [Fact]
+    public void Fixed_level_gear_shows_its_level_read_only()
+    {
+        Start();
+        var cut = _ctx.Render<InventoryTab>();
+
+        cut.Find(Slot(Eq(5))).Click();                                     // Alchemist Apprentice Hat: level 10, base 5
+        Assert.Empty(cut.FindAll(".detail .level input, .detail .level button"));
+        Assert.Equal("10", cut.Find(".detail .level .value").TextContent.Trim());
+        Assert.Contains("set by the game: base 5 plus upgrades", cut.Find(".detail .level").TextContent);
+        Assert.NotNull(cut.Find(".detail .rarity select"));                // its rarity can still change
+
+        cut.Find(Slot(Inv(20))).Click();                                   // Torch: level 1, base 1
+        Assert.Equal("1", cut.Find(".detail .level .value").TextContent.Trim());
+        Assert.Equal("set by the game", cut.Find(".detail .level .max").TextContent.Trim());
     }
 
     [Fact]
@@ -213,7 +233,7 @@ public sealed class InventoryTabTests : IDisposable
         Assert.Equal("Alchemist Apprentice Hat", cut.Find(".detail .name").TextContent.Trim());
         Assert.Equal("Equipped · Helmet", cut.Find(".detail .where").TextContent.Trim());
         Assert.Empty(cut.FindAll("button.remove"));                         // taking gear off isn't available
-        Assert.Equal("10", cut.Find(".detail .level input").GetAttribute("value"));
+        Assert.Equal("10", cut.Find(".detail .level .value").TextContent.Trim());
     }
 
     [Fact]

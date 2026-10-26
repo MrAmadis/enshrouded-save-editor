@@ -33,6 +33,9 @@ public class InventoryEditorTests : IDisposable
     const uint HerosShield = 0x0262764a;        // Equipment/Shield
     const uint ImprovedHook = 0x6aa6a1d4;       // Tools, Tool_Grappling_Hook_improved
     const uint AdvancedGlider = 0x534ba901;     // Tools, Tool_Glider_T2
+    const uint TalionsBow = 0x9ecd0c33;         // Weapons/RangedBow, levels 1–50
+    const uint BowOfTheSerpent21 = 0x1cf81b28;  // Weapons/RangedBow, levels 21–21: one of five items of that name
+    const uint EagleEyeTrousers = 0x88a1302d;   // Equipment/Legs, levels 30–50
 
     const string NeedsFull = "Adding and moving items isn't available for this character yet";
     const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
@@ -138,8 +141,8 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(3, s.ChangeCount);
 
         var before = s.Player.ToBytes();
-        Rejected(() => e.SetItemLevel(wand, 0));                   // levels 1–55
-        Rejected(() => e.SetItemLevel(wand, 56));
+        Rejected(() => e.SetItemLevel(wand, 0));                   // levels 1–50
+        Rejected(() => e.SetItemLevel(wand, 51));
         Rejected(() => e.SetRarity(wand, (Rarity)9));
         Rejected(() => e.SetDurability(wand, 401, 400));
         Rejected(() => e.SetDurability(wand, 0, 0));
@@ -161,36 +164,87 @@ public class InventoryEditorTests : IDisposable
     public void Equipped_records_allow_in_place_edits()
     {
         var s = Open(); var e = Ed(s);
-        e.SetItemLevel(Eq(5), 5);                                  // Hat: level 10 → 5 (reference levels 5–5)
-        e.SetRarity(Eq(5), Rarity.Epic);
+        e.SetRarity(Eq(5), Rarity.Epic);                           // Alchemist Apprentice Hat
+        e.SetDurability(Eq(12), 50, 70);                           // Spectral Ward: 68/68
         Assert.Equal(2, s.ChangeCount);
         var eq = Records(Reparsed(s), ContainerKind.Equipped);
         Assert.Equal(11, eq.Count);
-        Assert.Equal((byte)5, eq[0].Level);
         Assert.Equal(((byte)Rarity.Epic, (byte)5), eq[0].Rarity);
+        Assert.Equal((50u, 70u), eq[7].Durability);
     }
 
-    // T10-R1: the reference level range doesn't bound real records (this chest is level 10 against 5–5).
+    // Session B (docs/research/in-game-findings.md): the game sets the level of fixed-level gear (reference
+    // MinLevel == MaxLevel) to its base plus upgrades, and rewrites any other. This chest is 5 + 5 upgrades.
     [Fact]
-    public void Item_levels_run_from_1_to_55_whatever_the_reference_range()
+    public void Fixed_level_gear_refuses_level_edits()
     {
         var s = Open(); var e = Ed(s);
-        var chest = Eq(6);                                         // Alchemist Apprentice Chest: level 10, reference 5–5
-        Assert.Equal((byte)10, e.At(chest)!.Level);
-        e.SetItemLevel(chest, 12);
-        Assert.Equal((byte)12, e.At(chest)!.Level);
-        e.SetItemLevel(chest, 55);
-        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.SetItemLevel(chest, 0)).Message);
-        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.SetItemLevel(chest, 56)).Message);
+        var before = s.Player.ToBytes();
+        Assert.Equal("This item's level is set by the game: base 5 plus upgrades.",
+            Rejected(() => e.SetItemLevel(Eq(6), 12)).Message);    // Alchemist Apprentice Chest: level 10, reference 5–5
+        Assert.Equal("This item's level is set by the game: base 1 plus upgrades.",
+            Rejected(() => e.SetItemLevel(Inv(20), 3)).Message);   // Torch: level 1, reference 1–1
+        Assert.Equal(0, s.ChangeCount);
+        Assert.Equal(before, s.Player.ToBytes());
+    }
 
-        var helmet = e.Add(Item(AdventurerHelmet), 1, 55, Rarity.Rare, null);     // reference 10–10
-        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.Add(Item(AdventurerHelmet), 1, 56, null, null)).Message);
-        Rejected(() => e.Add(Item(AdventurerHelmet), 1, 0, null, null));
-        Assert.Equal(3, s.ChangeCount);
+    // Session B: Talion's Bow (1–50) kept the levels the editor wrote, 50 and 18.
+    [Fact]
+    public void Ranged_gear_takes_levels_within_its_range()
+    {
+        var s = Open(); var e = Ed(s);
+        const string OneToFifty = "The level must be between 1 and 50.";
+        var bow = e.Add(Item(TalionsBow), 1, 18, null, null);
+        e.SetItemLevel(bow, 50);
+        e.SetItemLevel(bow, 1);
+        Assert.Equal(OneToFifty, Rejected(() => e.SetItemLevel(bow, 51)).Message);
+        Assert.Equal(OneToFifty, Rejected(() => e.SetItemLevel(bow, 0)).Message);
+        Assert.Equal(OneToFifty, Rejected(() => e.Add(Item(TalionsBow), 1, 51, null, null)).Message);
 
-        var re = Reparsed(s);
-        Assert.Equal((byte)55, Records(re, ContainerKind.Equipped)[1].Level);
-        Assert.Equal((byte)55, Records(re, ContainerKind.Inventory).Single(r => r.Slot == helmet.Slot).Level);
+        var trousers = e.Add(Item(EagleEyeTrousers), 1, null, null, null);
+        Assert.Equal((byte)30, e.At(trousers)!.Level);             // the character's level 7, clamped to 30–50
+        Assert.Equal("The level must be between 30 and 50.", Rejected(() => e.SetItemLevel(trousers, 29)).Message);
+        Assert.Equal("The level must be between 30 and 50.", Rejected(() => e.Add(Item(EagleEyeTrousers), 1, 29, null, null)).Message);
+        Assert.Equal(4, s.ChangeCount);
+        Assert.Equal((byte)1, Records(Reparsed(s), ContainerKind.Inventory).Single(r => r.Slot == bow.Slot).Level);
+
+        var s1 = Open("character1.ksd"); var e1 = Ed(s1);
+        e1.SetItemLevel(Inv(7), 105);                              // Gem of Storm's Eye: levels 1–105, past the gear cap
+        Assert.Equal("The level must be between 1 and 105.", Rejected(() => e1.SetItemLevel(Inv(7), 106)).Message);
+    }
+
+    [Fact]
+    public void An_item_missing_from_the_game_data_takes_levels_1_to_55()
+    {
+        var s = Open(); var e = Ed(s);
+        e.At(Inv(16))!.ItemId = 0xdeadbeef;                        // the Scorching Wand's record, as an unknown item
+        e.SetItemLevel(Inv(16), 55);
+        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.SetItemLevel(Inv(16), 56)).Message);
+        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.SetItemLevel(Inv(16), 0)).Message);
+        Assert.Equal((byte)55, e.At(Inv(16))!.Level);
+    }
+
+    // Session B: the game rewrote level 22 to 21 on the level-21 Bow Of The Serpent.
+    [Fact]
+    public void Adding_fixed_level_gear_writes_its_base_level()
+    {
+        var s = Open(); var e = Ed(s);
+        var first = e.Add(Item(BowOfTheSerpent21), 1, null, null, null);
+        Assert.Equal((byte)21, e.At(first)!.Level);
+        e.At(first)!.Level = 22;                                   // a record at the level the editor used to write
+        var second = e.Add(Item(BowOfTheSerpent21), 1, null, null, null);
+        Assert.Equal((byte)21, e.At(second)!.Level);               // not the same-id record's 22
+        var third = e.Add(Item(BowOfTheSerpent21), 1, 21, null, null);   // the base level, given
+        Assert.Equal("This item's level is set by the game: base 21 plus upgrades.",
+            Rejected(() => e.Add(Item(BowOfTheSerpent21), 1, 22, null, null)).Message);
+
+        var hat = e.Add(Item(AlchemistHat), 1, null, null, null);
+        Assert.Equal(4, s.ChangeCount);
+        var inv = Records(Reparsed(s), ContainerKind.Inventory);
+        Assert.Equal((byte)21, inv.Single(r => r.Slot == third.Slot).Level);
+        var newHat = inv.Single(r => r.Slot == hat.Slot);
+        Assert.Equal((byte)5, newHat.Level);                       // base 5, not the worn hat's 10 (5 upgrades)
+        Assert.Equal(((byte)Rarity.Uncommon, (byte)0), newHat.Rarity);   // and no upgrades
     }
 
     [Fact]
@@ -247,7 +301,7 @@ public class InventoryEditorTests : IDisposable
         Rejected(() => e.Add(ore, 0, null, null, null));
         Rejected(() => e.Add(ore, 251, null, null, null));
         Rejected(() => e.Add(bow, 2, 20, Rarity.Epic, null));        // gear stacks to 1
-        Rejected(() => e.Add(bow, 1, 56, null, null));               // levels 1–55
+        Rejected(() => e.Add(bow, 1, 51, null, null));               // levels 1–50
         Rejected(() => e.Add(bow, 1, 0, null, null));
         Rejected(() => e.Add(bow, 1, 20, (Rarity)0, null));
         Rejected(() => e.Add(ore, 1, 13, null, null));               // a material has no level field
@@ -667,8 +721,8 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(0x04, pouch.Flags);
         Assert.Equal(inv.Single(r => r.ItemId == WaterPouch).Bit2, pouch.Bit2);
 
-        // T10-R1b: character1's first Water Pouch has a level field (flags 05, level 0). The default never changes
-        // the field set, and takes the same-id record's own level; an explicit level still sets it.
+        // character1's first Water Pouch has a level field (flags 05, level 0). The default never changes the field
+        // set; the pouch's levels are 0–0, so it gets 0. An explicit level still sets it.
         var pc1 = Open("character1.ksd").Player;
         var template1 = Records(pc1, ContainerKind.Inventory).First(r => r.ItemId == WaterPouch);
         Assert.Equal(0x05, template1.Flags);
@@ -678,13 +732,9 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(template1.Bit2, pouch1.Bit2);
         Assert.Equal((byte)3, NewItemFields.Create(Item(WaterPouch), 0, 1, 3, null, pc1, _items).Level);
 
-        // T10-R1b: with no level given, a same-id record's own level (the Scorching Wand's 11, not the character's
-        // 7), capped at MaxItemLevel.
-        var wandTemplate = inv.Single(r => r.ItemId == ScorchingWand);
-        Assert.Equal((byte)11, NewItemFields.Create(Item(ScorchingWand), 0, 1, null, null, pc, _items).Level);
-        wandTemplate.Level = 60;
-        Assert.Equal((byte)InventoryLayout.MaxItemLevel, NewItemFields.Create(Item(ScorchingWand), 0, 1, null, null, pc, _items).Level);
-        wandTemplate.Level = 11;
+        // With no level given, a ranged item gets the character's level clamped to its range, not a same-id record's
+        // own level: the Scorching Wand (1–50) gets 7, not the record's 11 (which may include upgrades).
+        Assert.Equal((byte)7, NewItemFields.Create(Item(ScorchingWand), 0, 1, null, null, pc, _items).Level);
 
         // Same id: full durability and an empty socket, whatever the template holds.
         inv.Single(r => r.ItemId == ScorchingWand).Gem = (0x12345678, 1);
@@ -696,7 +746,7 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal((0u, (byte)0), wand.Gem);
     }
 
-    // T10-R1b: the default level never changes the field set; a 0–0 range gives level 0.
+    // The default level never changes the field set; a 0–0 item gets its base level, 0.
     [Fact]
     public void Gear_with_a_0_to_0_level_range_keeps_its_level_field()
     {

@@ -16,12 +16,15 @@ public sealed record CharacterView(
 /// <param name="Rarity">The record's rarity, or else the item's base rarity (for the tint); null when neither is known.</param>
 /// <param name="MaxStack">The most a stack may hold: 1 to 65535 (65535 for an unknown item), as SetCount allows.</param>
 /// <param name="Level">The record's item level; null when it has no level field (then it can't be set).</param>
-/// <param name="MinLevel">The item's reference level range; it sets the default when adding, not the limits (1–55).</param>
+/// <param name="MinLevel">The item's reference level range, the levels SetItemLevel allows; null for an unknown item
+/// (which allows 1 to <see cref="InventoryLayout.MaxItemLevel"/>).</param>
+/// <param name="FixedLevel">The game sets the level (<see cref="ItemInfo.FixedLevel"/>): <paramref name="MinLevel"/> plus
+/// upgrades. It can't be set.</param>
 /// <param name="Durability">Null when the record has no durability field.</param>
 /// <param name="HasRarity">Whether the record has a rarity field, so its rarity can be set.</param>
 public sealed record ItemView(
     uint Id, string Name, ItemCategory? Category, Rarity? Rarity, int Count, int MaxStack, int? Level, int? MinLevel, int? MaxLevel,
-    uint? Durability, uint? MaxDurability, bool Known, string IconUrl, bool HasRarity);
+    bool FixedLevel, uint? Durability, uint? MaxDurability, bool Known, string IconUrl, bool HasRarity);
 
 /// <summary>
 /// One slot: an Inventory or Extra slot, or an Equipped position (<see cref="ItemRef"/>). <paramref name="Item"/> is null
@@ -72,7 +75,9 @@ public sealed record SessionView(
 /// <param name="SubCategory">The weapon type for Weapons ("RangedBow"; "" when it has none), the <see cref="EquipSlot"/>
 /// name for Equipment ("Helmet"; "None" for backpacks, wards and appearance pieces), and "" otherwise.</param>
 /// <param name="MaxStack">1 to 65535, as AddItem allows.</param>
+/// <param name="FixedLevel">The game sets the level (<see cref="ItemInfo.FixedLevel"/>), so a new one is added at
+/// <paramref name="MinLevel"/>; otherwise AddItem takes a level from <paramref name="MinLevel"/> to <paramref name="MaxLevel"/>.</param>
 /// <param name="InternalName">The game's own name ("Weapon_T1_2H_BowEpic_02"), which the browser's search also covers.</param>
 public sealed record CatalogEntryView(
     uint Id, string Name, ItemCategory Category, string SubCategory, Rarity BaseRarity, int MaxStack, int MinLevel, int MaxLevel,
-    string IconUrl, string InternalName);
+    bool FixedLevel, string IconUrl, string InternalName);

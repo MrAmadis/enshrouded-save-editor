@@ -59,12 +59,17 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         s.MarkChanged();
     }
 
-    /// <summary>1 to <see cref="InventoryLayout.MaxItemLevel"/> for any item; the record must have a level.</summary>
+    /// <summary>
+    /// The record must have a level, and the item a level it may take (<see cref="EnsureLevelAllowed"/>). A
+    /// fixed-level item's is set by the game (<see cref="ItemInfo.FixedLevel"/>), so it can't be changed at all.
+    /// </summary>
     public void SetItemLevel(ItemRef r, int level)
     {
         var rec = Item(r);
         if (rec.Level is not { } current) throw new EditRejectedException($"{NameOf(rec)} has no item level.");
-        EnsureLevelInRange(level);
+        var info = items.Find(rec.ItemId);
+        if (info is { FixedLevel: true }) throw LevelSetByGame(info);
+        EnsureLevelAllowed(info, level);
         if (level == current) throw new EditRejectedException($"Already level {level}");
         rec.Level = (byte)level;
         s.MarkChanged();
@@ -141,8 +146,8 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
     /// Adds a stack to <paramref name="target"/>, an empty or ghost Inventory slot or Extra slot within
     /// <see cref="ExtraCapacity"/>, or else to the first such slot of the backpack grid (T12-R2: Inventory 0–15, then
     /// 32–39, then Extra from 0; the action bar, Inventory 16–31, only when targeted). A ghost there is replaced.
-    /// <see cref="InventoryStatus.Full"/> only. Fields come from <see cref="NewItemFields.Create"/>; a level or rarity
-    /// the new record has no field for is rejected.
+    /// <see cref="InventoryStatus.Full"/> only. Fields come from <see cref="NewItemFields.Create"/>; a level the item
+    /// may not take (<see cref="EnsureLevelAllowed"/>), and a level or rarity the new record has no field for, are rejected.
     /// </summary>
     public ItemRef Add(ItemInfo info, int count, int? level, Rarity? rarity, ItemRef? target)
     {
@@ -150,7 +155,7 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         EnsureFull();
         var maxStack = MaxStack(info);
         if (count < 1 || count > maxStack) throw new EditRejectedException($"The count must be between 1 and {maxStack}.");
-        if (level is { } l) EnsureLevelInRange(l);
+        if (level is { } l) EnsureLevelAllowed(info, l);
         if (rarity is { } v && !Enum.IsDefined(v)) throw new EditRejectedException("Unknown rarity.");
 
         ItemRef at;
@@ -312,10 +317,21 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
 
     static int MaxStack(ItemInfo info) => Math.Clamp(info.MaxStack, 1, ushort.MaxValue);
 
-    /// <summary>T10-R1: 1 to <see cref="InventoryLayout.MaxItemLevel"/> for every item, whatever its reference range.</summary>
-    static void EnsureLevelInRange(int level)
+    /// <summary>
+    /// Session B (docs/research/in-game-findings.md): a fixed-level item takes only its base level, a ranged one its
+    /// reference range, and an item missing from the game data 1 to <see cref="InventoryLayout.MaxItemLevel"/>.
+    /// </summary>
+    static void EnsureLevelAllowed(ItemInfo? info, int level)
     {
-        if (level < 1 || level > InventoryLayout.MaxItemLevel)
-            throw new EditRejectedException($"The level must be between 1 and {InventoryLayout.MaxItemLevel}.");
+        if (info is { FixedLevel: true })
+        {
+            if (level != info.MinLevel) throw LevelSetByGame(info);
+            return;
+        }
+        var (min, max) = info is null ? (1, InventoryLayout.MaxItemLevel) : (info.MinLevel, Math.Min(info.MaxLevel, byte.MaxValue));
+        if (level < min || level > max) throw new EditRejectedException($"The level must be between {min} and {max}.");
     }
+
+    static EditRejectedException LevelSetByGame(ItemInfo info) =>
+        new($"This item's level is set by the game: base {info.MinLevel} plus upgrades.");
 }

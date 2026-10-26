@@ -326,7 +326,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
             return _catalog ??= Data.Items.All
                 .Where(i => i.Category != ItemCategory.Customization)
                 .Select(i => new CatalogEntryView(i.Id, i.Name, i.Category, SubCategory(i), i.BaseRarity, MaxStack(i), i.MinLevel,
-                    i.MaxLevel, icons.ItemIcon(i.Id, i), i.InternalName))
+                    i.MaxLevel, i.FixedLevel, icons.ItemIcon(i.Id, i), i.InternalName))
                 .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(c => c.Id)
                 .ToList()
@@ -334,19 +334,20 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
     }
 
     /// <summary>
-    /// Whether a stack of <paramref name="itemId"/> added now would get a level and a rarity field. The field set comes
-    /// from a record already in this save (<see cref="NewItemFields.Create"/>), so the Add item panel offers only the
-    /// fields <see cref="AddItem"/> can set. Changes nothing; false for an unknown or Customization item.
+    /// The level a stack of <paramref name="itemId"/> added now would get by default (null when it gets no level field),
+    /// and whether it would get a rarity field. The field set comes from a record already in this save
+    /// (<see cref="NewItemFields.Create"/>), so the Add item panel offers only the fields <see cref="AddItem"/> can set.
+    /// Changes nothing; (null, false) for an unknown or Customization item.
     /// </summary>
-    public (bool Level, bool Rarity) AddFields(uint itemId)
+    public (int? Level, bool Rarity) AddFields(uint itemId)
     {
         lock (_lock)
         {
             var session = Session;
             if (Data.Items.Find(itemId) is not { } info || info.Category == ItemCategory.Customization)
-                return (false, false);
+                return (null, false);
             var rec = NewItemFields.Create(info, 0, 1, null, null, session.Player, Data.Items);
-            return (rec.Level is not null, rec.Rarity is not null);
+            return (rec.Level, rec.Rarity is not null);
         }
     }
 
@@ -554,7 +555,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         Rarity? own = rec.Rarity is { } r && Enum.IsDefined((Rarity)r.Rarity) ? (Rarity)r.Rarity : null;
         return new ItemView(
             rec.ItemId, info?.Name ?? UnknownItem(rec.ItemId), info?.Category, own ?? info?.BaseRarity, rec.Count, MaxStack(info),
-            rec.Level, info?.MinLevel, info?.MaxLevel, rec.Durability?.Current, rec.Durability?.Max, info is not null,
-            icons.ItemIcon(rec.ItemId, info), rec.Rarity is not null);
+            rec.Level, info?.MinLevel, info?.MaxLevel, info?.FixedLevel ?? false, rec.Durability?.Current, rec.Durability?.Max,
+            info is not null, icons.ItemIcon(rec.ItemId, info), rec.Rarity is not null);
     }
 }
