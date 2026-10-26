@@ -61,14 +61,26 @@ public sealed class IconService(string iconCacheRoot, IIconTextureSource? textur
         return extracted ? $"https://{Host}/{name}" : null;
     }
 
+    /// <summary>
+    /// Whether the id's PNG is in the cache. Never throws: the answer is kept for the session, so a failure kept as an
+    /// exception would come back on every later request for the id.
+    /// </summary>
     bool Extract(IIconTextureSource source, string name, Func<IIconTextureSource, IconTexture?> read)
     {
-        var path = Path.Combine(CacheRoot, name);
-        bool current;
-        lock (_versionLock) current = _cacheIsCurrent ??= DropStaleTextures(source);
-        if (current && File.Exists(path)) return true;
-        if (read(source) is not { } t || t.Width <= 0 || t.Height <= 0 || t.Rgba.Length != t.Width * t.Height * 4) return false;
-        return Save(path, Png.Encode(t));
+        try
+        {
+            var path = Path.Combine(CacheRoot, name);
+            bool current;
+            lock (_versionLock) current = _cacheIsCurrent ??= DropStaleTextures(source);
+            if (current && File.Exists(path)) return true;
+            if (read(source) is not { } t || t.Width <= 0 || t.Height <= 0 || t.Rgba.Length != t.Width * t.Height * 4) return false;
+            return Save(path, Png.Encode(t));
+        }
+        catch (Exception)
+        {
+            // Whatever the texture source or the PNG encoder throws, the icon is the glyph.
+            return false;
+        }
     }
 
     /// <summary>

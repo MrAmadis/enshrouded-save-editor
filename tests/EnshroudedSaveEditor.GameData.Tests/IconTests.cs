@@ -46,6 +46,7 @@ public sealed class IconTests(InstallIconsFixture install) : IClassFixture<Insta
     {
         public int Calls;
         public HashSet<uint> Missing { get; } = [];
+        public HashSet<uint> Throwing { get; } = [];
         public string Version => version;
         public IconTexture? ItemTexture(uint id) => Texture(id);
         public IconTexture? SkillTexture(uint nodeId) => Texture(nodeId);
@@ -53,6 +54,7 @@ public sealed class IconTests(InstallIconsFixture install) : IClassFixture<Insta
         IconTexture? Texture(uint id)
         {
             Interlocked.Increment(ref Calls);
+            if (Throwing.Contains(id)) throw new InvalidCastException("a texture source bug");
             return Missing.Contains(id) ? null : new IconTexture(2, 2, [255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 0, 0, 0, 0]);
         }
     }
@@ -167,6 +169,20 @@ public sealed class IconTests(InstallIconsFixture install) : IClassFixture<Insta
         Assert.Equal("https://icons.ese/glyph/materials.svg", icons.ItemIcon(9, ore));
         Assert.Equal("https://icons.ese/glyph/materials.svg", icons.ItemIcon(9, ore));
         Assert.Equal(1, textures.Calls);
+    }
+
+    [Fact]
+    public void A_texture_source_that_throws_gives_the_glyph_every_time()
+    {
+        var textures = new FakeTextures();
+        textures.Throwing.Add(9);
+        var icons = new IconService(_cache, textures);
+        var ore = Reference.Items.All.First(i => i.Category == ItemCategory.Materials);
+
+        Assert.Equal("https://icons.ese/glyph/materials.svg", icons.ItemIcon(9, ore));
+        Assert.Equal("https://icons.ese/glyph/materials.svg", icons.ItemIcon(9, ore));
+        Assert.Equal(1, textures.Calls);
+        Assert.Equal("https://icons.ese/item/00000007.png", icons.ItemIcon(7, null));
     }
 
     [Fact]

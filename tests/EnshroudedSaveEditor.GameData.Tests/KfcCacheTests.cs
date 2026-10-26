@@ -60,14 +60,67 @@ public sealed class KfcCacheTests : IDisposable
         Assert.Null(KfcCache.Read(CachePath, "key-1"));
     }
 
-    [Fact]
-    public void The_key_follows_the_size_and_time_of_the_kfc_and_the_exe()
+    /// <summary>A stand-in game folder: the cache key needs only the files' sizes and times.</summary>
+    GameInstall FakeInstall()
     {
         var game = Path.Combine(_tmp, "game");
         Directory.CreateDirectory(game);
         foreach (var f in new[] { "enshrouded.exe", "enshrouded.kfc", "enshrouded.kfc_resources" })
             File.WriteAllText(Path.Combine(game, f), "x");
-        var install = GameInstall.Find(game)!;
+        return GameInstall.Find(game)!;
+    }
+
+    [Fact]
+    public void A_complete_read_is_cached()
+    {
+        var install = FakeInstall();
+        var reads = 0;
+        KfcSnapshot Read(GameInstall _) { reads++; return Sample; }
+
+        KfcGameData.Load(install, Path.Combine(_tmp, "cache"), Read);
+        var again = KfcGameData.Load(install, Path.Combine(_tmp, "cache"), Read);
+
+        Assert.Equal(1, reads);
+        Assert.Equal(Sample.Items, again.Items.All);
+    }
+
+    // A piece may fail only this time (a .dat file Steam is writing on a patch day): it is read again on the next start.
+    [Fact]
+    public void A_read_with_a_missing_piece_is_not_cached()
+    {
+        var install = FakeInstall();
+        var cache = Path.Combine(_tmp, "cache");
+        var reads = 0;
+        KfcSnapshot Read(GameInstall _) { reads++; return Sample with { Rewards = null }; }
+
+        var first = KfcGameData.Load(install, cache, Read);
+        var second = KfcGameData.Load(install, cache, Read);
+
+        Assert.Equal(2, reads);
+        Assert.False(File.Exists(CachePath));
+        Assert.Throws<NotSupportedException>(() => second.Rewards);
+        Assert.Equal(Sample.Items, first.Items.All);
+    }
+
+    [Fact]
+    public void A_cache_with_a_missing_piece_is_read_again()
+    {
+        var install = FakeInstall();
+        KfcCache.Write(CachePath, KfcCache.Key(install), Sample with { Tree = null });
+        var reads = 0;
+
+        var data = KfcGameData.Load(install, Path.Combine(_tmp, "cache"), _ => { reads++; return Sample; });
+
+        Assert.Equal(1, reads);
+        Assert.Equal(2, data.Tree.Nodes.Count);
+        Assert.NotNull(KfcCache.Read(CachePath, KfcCache.Key(install))!.Tree);
+    }
+
+    [Fact]
+    public void The_key_follows_the_size_and_time_of_the_kfc_and_the_exe()
+    {
+        var install = FakeInstall();
+        var game = install.Dir;
         var key = KfcCache.Key(install);
         Assert.Equal(key, KfcCache.Key(install));
 

@@ -28,8 +28,16 @@ internal readonly struct KfcValue
     public KfcValue? Get(string field) =>
         Type.Field(field) is { } f ? new KfcValue(_types, f.Type, _data, _at + f.Offset) : null;
 
-    /// <summary>Any integer, enum or bitmask, widened.</summary>
-    public long Int => Type.Kind switch
+    /// <summary>
+    /// The most single-field structs (such as <c>keen::Time</c>) that <see cref="Int"/> and <see cref="Float"/> look
+    /// through; more means misread metadata.
+    /// </summary>
+    const int MaxWrappers = 16;
+
+    /// <summary>Any integer, enum or bitmask, widened; also one wrapped in single-field structs.</summary>
+    public long Int => Unwrapped().Integer;
+
+    long Integer => Type.Kind switch
     {
         KfcKind.Bool or KfcKind.UInt8 => Span(1)[0],
         KfcKind.SInt8 => (sbyte)Span(1)[0],
@@ -45,19 +53,33 @@ internal readonly struct KfcValue
             4 => BinaryPrimitives.ReadUInt32LittleEndian(Span(4)),
             _ => BinaryPrimitives.ReadInt64LittleEndian(Span(8)),
         },
-        KfcKind.Struct when Type.Fields.Count == 1 => this[Type.Fields[0].Name].Int,
         _ => throw Wrong("an integer"),
     };
 
     public uint UInt => (uint)Int;
 
-    public double Float => Type.Kind switch
+    /// <summary>A float; also one wrapped in single-field structs.</summary>
+    public double Float => Unwrapped().Real;
+
+    double Real => Type.Kind switch
     {
         KfcKind.Float32 => BinaryPrimitives.ReadSingleLittleEndian(Span(4)),
         KfcKind.Float64 => BinaryPrimitives.ReadDoubleLittleEndian(Span(8)),
-        KfcKind.Struct when Type.Fields.Count == 1 => this[Type.Fields[0].Name].Float,
         _ => throw Wrong("a float"),
     };
+
+    /// <summary>The value inside single-field structs (this one when it isn't such a struct).</summary>
+    KfcValue Unwrapped()
+    {
+        var v = this;
+        for (var depth = 0; v.Type is { Kind: KfcKind.Struct, Fields: [var f] }; depth++)
+        {
+            if (depth == MaxWrappers)
+                throw new InvalidDataException($"{Type.QualifiedName} wraps more than {MaxWrappers} single-field structs.");
+            v = new KfcValue(_types, f.Type, _data, v._at + f.Offset);
+        }
+        return v;
+    }
 
     /// <summary>The name of an enum value; the number when it has none.</summary>
     public string EnumName

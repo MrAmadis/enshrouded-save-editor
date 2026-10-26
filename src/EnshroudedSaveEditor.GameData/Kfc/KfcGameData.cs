@@ -33,18 +33,24 @@ public sealed class KfcGameData : IGameData
     public string Source => "Your Enshrouded install";
 
     /// <summary>
-    /// The install's data: from the cache when it was made from these game files, else read from the install (and cached).
-    /// Throws when the install's archive or type metadata can't be opened at all.
+    /// The install's data: from the cache when it was made from these game files, else read from the install (and cached
+    /// when every piece could be read). Throws when the install's archive or type metadata can't be opened at all.
     /// </summary>
-    public static KfcGameData Load(GameInstall g, string cacheDir)
+    public static KfcGameData Load(GameInstall g, string cacheDir) => Load(g, cacheDir, Extract);
+
+    /// <summary>Tests: <see cref="Load(GameInstall, string)"/> with another reader of the install.</summary>
+    internal static KfcGameData Load(GameInstall g, string cacheDir, Func<GameInstall, KfcSnapshot> extract)
     {
         var path = Path.Combine(cacheDir, CacheFile);
         var key = KfcCache.Key(g);
-        if (KfcCache.Read(path, key) is { } cached) return new KfcGameData(cached);
-        var snapshot = Extract(g);
-        KfcCache.Write(path, key, snapshot);
+        if (KfcCache.Read(path, key) is { } cached && Complete(cached)) return new KfcGameData(cached);
+        var snapshot = extract(g);
+        // A piece that failed may fail only this time (a file Steam is writing): it is read again on the next start.
+        if (Complete(snapshot)) KfcCache.Write(path, key, snapshot);
         return new KfcGameData(snapshot);
     }
+
+    static bool Complete(KfcSnapshot s) => s is { Items: not null, Tree: not null, Rewards: not null, LevelCap: not null };
 
     sealed record LevelCaps(int Player, int Item);
 

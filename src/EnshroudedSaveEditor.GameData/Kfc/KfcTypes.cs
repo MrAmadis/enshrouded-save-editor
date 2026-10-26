@@ -62,7 +62,8 @@ internal sealed class KfcTypes
 
     public IReadOnlyList<KfcType> All { get; }
 
-    KfcTypes(List<KfcType> all)
+    /// <summary>Throws <see cref="InvalidDataException"/> when a typedef or base-struct chain comes back round.</summary>
+    internal KfcTypes(List<KfcType> all)
     {
         All = all;
         foreach (var t in all)
@@ -70,6 +71,18 @@ internal sealed class KfcTypes
             _byHash.TryAdd(t.Hash, t);
             _byName.TryAdd(t.QualifiedName, t);
         }
+        foreach (var t in all) RejectCycle(t);
+    }
+
+    /// <summary>
+    /// <see cref="KfcType.Resolved"/> and <see cref="KfcType.Field"/> follow <see cref="KfcType.Inner"/> from typedefs and
+    /// structs. In valid metadata that chain ends; misread metadata could make it loop forever.
+    /// </summary>
+    static void RejectCycle(KfcType type)
+    {
+        var seen = new HashSet<KfcType>();
+        for (var t = type; t is { Kind: KfcKind.Typedef or KfcKind.Struct }; t = t.Inner)
+            if (!seen.Add(t)) throw new InvalidDataException($"The type {type.QualifiedName} is based on itself.");
     }
 
     public KfcType? Find(uint hash) => _byHash.GetValueOrDefault(hash);
