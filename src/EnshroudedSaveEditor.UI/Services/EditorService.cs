@@ -557,7 +557,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
 
         var nodes = data.Tree.Nodes
             .Select(n => new SkillNodeView(n.Id, n.Name, n.Description, n.Type, n.Class, n.Cost, skills.RankOf(n.Id), n.MaxRank,
-                skills.StateOf(n.Id), n.X, n.Y, AttributeOf(n), icons.SkillPicture(n)))
+                skills.StateOf(n.Id), n.X, n.Y, AttributeOf(n), icons.SkillPicture(n), TitleOf(n)))
             .ToList();
 
         var level = (int)s.Player.Level;
@@ -583,6 +583,14 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
             ? null
             : Attributes.FirstOrDefault(a => n.Name.Contains(a.Word, StringComparison.OrdinalIgnoreCase)).Tag
               ?? Attributes.FirstOrDefault(a => n.Description.Contains(a.Word, StringComparison.OrdinalIgnoreCase)).Tag;
+
+    /// <summary>A named skill's name; null for a Spark and for an attribute node named after its attribute.</summary>
+    private static string? TitleOf(SkillNode n) => n.Type switch
+    {
+        SkillNodeType.Spark => null,
+        SkillNodeType.Attribute when Attributes.Any(a => a.Word.Equals(n.Name, StringComparison.OrdinalIgnoreCase)) => null,
+        _ => n.Name,
+    };
 
     /// <summary>R6: <c>XpPerLevel[level − 1]</c>; null without a table, past its end, or at the cap.</summary>
     private static uint? XpToNextLevel(IGameData data, int level) =>

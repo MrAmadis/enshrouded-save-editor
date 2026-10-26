@@ -30,7 +30,7 @@
         {
             <circle cx="@F(x)" cy="@F(y)" r="@F(Radius(n.Type))" class="@cls" style="@style" data-id="@n.Id" />
         }
-        @if (n.Picture is not null || n.Attribute is not null || n.MaxRank > 1)
+        @if (n.Picture is not null || n.Attribute is not null || n.MaxRank > 1 || n.Title is not null)
         {
             @Detail(n, x, y)
         }
@@ -129,9 +129,22 @@
         b.CloseElement();
     };
 
-    // What a node adds once zoomed in (skilltree.js sets "near"): the game's picture, the attribute it raises, and
-    // learned/max ranks for a skill with more than one rank. Built by hand for the same reason as Label.
-    private const double PictureSize = 9, AbilityReach = 8.8, TagWidth = 7.6, TagHeight = 3.8;
+    // What a node adds once zoomed in (skilltree.js sets "near"): its title above it, the game's picture, the attribute
+    // it raises, and learned/max ranks for a skill with more than one rank. Built by hand for the same reason as Label.
+    private const double PictureSize = 9, AbilityReach = 8.8, TagWidth = 7.6, TagHeight = 3.8, TitleLine = 2.6;
+    private const int TitleWrap = 14;
+
+    /// <summary>A title longer than <see cref="TitleWrap"/> characters breaks at the space nearest its middle.</summary>
+    private static string[] TitleLines(string title)
+    {
+        if (title.Length <= TitleWrap)
+            return [title];
+        var spaces = Enumerable.Range(0, title.Length).Where(i => title[i] == ' ').ToList();
+        if (spaces.Count == 0)
+            return [title];
+        var at = spaces.MinBy(i => Math.Abs(i - title.Length / 2));
+        return [title[..at], title[(at + 1)..]];
+    }
 
     private RenderFragment Detail(SkillNodeView n, double x, double y) => b =>
     {
@@ -174,6 +187,22 @@
             b.AddAttribute(24, "x", F(x));
             b.AddAttribute(25, "y", F(top + 2.85));
             b.AddContent(26, $"{n.Rank}/{n.MaxRank}");
+            b.CloseElement();
+        }
+        if (n.Title is { } title)
+        {
+            var lines = TitleLines(title);
+            var bottom = y - (n.Type == SkillNodeType.Ability ? AbilityReach : Radius(n.Type)) - 1;
+            b.OpenElement(27, "text");
+            b.AddAttribute(28, "class", "title");
+            for (var i = 0; i < lines.Length; i++)
+            {
+                b.OpenElement(29, "tspan");
+                b.AddAttribute(30, "x", F(x));
+                b.AddAttribute(31, "y", F(bottom - (lines.Length - 1 - i) * TitleLine));
+                b.AddContent(32, lines[i]);
+                b.CloseElement();
+            }
             b.CloseElement();
         }
         b.CloseElement();

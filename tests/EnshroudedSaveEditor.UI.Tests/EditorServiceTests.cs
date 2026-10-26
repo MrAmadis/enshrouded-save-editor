@@ -522,6 +522,22 @@ public sealed class EditorServiceTests : IDisposable
         Assert.All(v.Nodes, n => Assert.Equal(n.Type == SkillNodeType.Attribute, n.Attribute is not null));
     }
 
+    // Owner, 2026-10-26: named skills show their title once zoomed in. Sparks are all "Spark", and a plain attribute
+    // node's name ("Strength") is what its tag already says.
+    [Fact]
+    public void Named_skills_carry_a_title()
+    {
+        var v = Start().Open(C(2));
+        SkillNodeView Named(string name) => v.Nodes.First(n => n.Name == name);
+
+        Assert.Null(Named("Spark").Title);
+        Assert.Null(Named("Strength").Title);
+        Assert.Equal("Barbarian", Named("Barbarian").Title);              // an attribute node with a name of its own
+        Assert.Equal("Bee Sting", Named("Bee Sting").Title);              // an ability
+        Assert.Equal("Well Rested", Named("Well Rested").Title);          // a passive
+        Assert.Equal(172, v.Nodes.Count(n => n.Title is not null));       // 43 abilities, 123 passives, 6 attribute nodes
+    }
+
     /// <summary>Like the install: a picture for abilities only.</summary>
     sealed class AbilityTextures(IGameData game) : IIconTextureSource
     {

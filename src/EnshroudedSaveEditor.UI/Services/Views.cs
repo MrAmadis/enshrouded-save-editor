@@ -37,9 +37,11 @@ public sealed record SlotView(ItemRef Ref, string? Label, ItemView? Item);
 /// <param name="State">Sparks are always <see cref="NodeState.Learned"/>.</param>
 /// <param name="Attribute">For an attribute node, the attribute it raises: "STR", "DEX", "INT", "CON", "SPI" or "END".</param>
 /// <param name="Picture">The node's own picture from the install (abilities have one); null when it has none.</param>
+/// <param name="Title">The name the tree shows above a named skill; null for Sparks (all "Spark") and for attribute nodes
+/// named after their attribute ("Strength", which <paramref name="Attribute"/> already says).</param>
 public sealed record SkillNodeView(
     uint Id, string Name, string Description, SkillNodeType Type, SkillClass Class, int Cost, int Rank, int MaxRank, NodeState State,
-    double X, double Y, string? Attribute, string? Picture);
+    double X, double Y, string? Attribute, string? Picture, string? Title);
 
 /// <summary>The open character.</summary>
 /// <param name="Equipped">The 16 Equipped positions in order (<see cref="InventoryLayout.EquipPositions"/>).</param>

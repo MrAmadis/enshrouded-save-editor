@@ -1,7 +1,8 @@
 // Zoomable skill tree: a port of the interaction in docs/superpowers/specs/mockups/skills-tree.html.
 // The SVG's viewBox is owned by this script; Blazor renders the same static viewBox and never patches it.
-// From NEAR× on, the nodes show their details (pictures, attribute tags, rank counts): class "near" on the SVG.
-const S = 640, MIN = S / 10, NEAR = 2;
+// From NEAR× on, the nodes show their details (pictures, attribute tags, rank counts): class "near" on the SVG. Their
+// titles need more room, so they wait for NEARER×: class "nearer".
+const S = 640, MIN = S / 10, NEAR = 2, NEARER = 3;
 const states = new WeakMap();
 
 const state = svg => states.get(svg);
@@ -12,6 +13,7 @@ function apply(svg) {
     const vb = st.vb;
     svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
     svg.classList.toggle("near", S / vb.w >= NEAR);
+    svg.classList.toggle("nearer", S / vb.w >= NEARER);
     const lvl = svg.closest(".tree-panel")?.querySelector(".zoomlvl");
     if (lvl) lvl.textContent = (S / vb.w).toFixed(1) + "×";
 }

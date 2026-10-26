@@ -1,3 +1,4 @@
+using System.Globalization;
 using Bunit;
 using EnshroudedSaveEditor.Core.Editing;
 using EnshroudedSaveEditor.Core.Files;
@@ -261,7 +262,7 @@ public sealed class SkillsTabTests : IDisposable
         _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
         SkillNodeView Node(uint id, SkillNodeType type, int rank, int maxRank, NodeState state, double x, string? attribute = null,
             string? picture = null) =>
-            new(id, $"Node {id}", "", type, SkillClass.Warrior, 1, rank, maxRank, state, x, 0, attribute, picture);
+            new(id, $"Node {id}", "", type, SkillClass.Warrior, 1, rank, maxRank, state, x, 0, attribute, picture, null);
         IReadOnlyList<SkillNodeView> nodes =
         [
             Node(1, SkillNodeType.Ability, 2, 3, NodeState.Learned, 0, picture: "pic://bash"),
@@ -280,6 +281,26 @@ public sealed class SkillsTabTests : IDisposable
         Assert.Equal(3, cut.FindAll("svg.tree .detail").Count);            // nodes 4 and 5 have nothing to add
         Assert.Contains("pic", cut.Find("svg.tree rect.nd[data-id='1']").ClassList);
         Assert.Equal(5, cut.FindAll("svg.tree .nd").Count);
+    }
+
+    // Owner, 2026-10-26: a named skill's title sits above it once zoomed in; a long one takes two lines.
+    [Fact]
+    public void Named_skills_show_their_title_above_the_node()
+    {
+        _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
+        SkillNodeView Node(uint id, double x, string? title) =>
+            new(id, title ?? "Strength", "", SkillNodeType.Passive, SkillClass.Ranger, 1, 0, 1, NodeState.Locked, x, 0, null, null, title);
+        IReadOnlyList<SkillNodeView> nodes = [Node(1, 0, "Bee Sting"), Node(2, 10, "Felling Axe Specialization"), Node(3, 20, null)];
+        var cut = _ctx.Render<SkillTree>(p => p.Add(t => t.Nodes, nodes).Add(t => t.Links, []).Add(t => t.Labels, []));
+
+        var titles = cut.FindAll("svg.tree .detail .title");
+        Assert.Equal(2, titles.Count);                                     // the untitled node adds nothing
+        Assert.Equal(["Bee Sting"], titles[0].QuerySelectorAll("tspan").Select(t => t.TextContent));
+        Assert.Equal(["Felling Axe", "Specialization"], titles[1].QuerySelectorAll("tspan").Select(t => t.TextContent));
+        var circle = cut.Find("svg.tree circle.nd[data-id='1']");
+        var bottomLine = titles[0].QuerySelectorAll("tspan")[^1];
+        Assert.True(double.Parse(bottomLine.GetAttribute("y")!, CultureInfo.InvariantCulture)
+                    < double.Parse(circle.GetAttribute("cy")!, CultureInfo.InvariantCulture) - double.Parse(circle.GetAttribute("r")!, CultureInfo.InvariantCulture));
     }
 
     [Fact]

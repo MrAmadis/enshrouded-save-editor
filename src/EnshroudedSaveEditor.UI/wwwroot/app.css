@@ -469,6 +469,11 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .tree .detail.learned .rank-tag { stroke: var(--c); }
 .tree .rank { font-family: "Source Sans 3", sans-serif; font-size: 2.6px; text-anchor: middle; fill: var(--dim); }
 .tree .detail.learned .rank { fill: var(--gold-2); }
+/* Titles need more room: they show from 3× (.nearer). */
+.tree .title { display: none; font-family: "Source Sans 3", sans-serif; font-size: 2.4px; text-anchor: middle; fill: var(--dim); paint-order: stroke; stroke: #0b0f14; stroke-width: .6px; }
+.tree.nearer .title { display: inline; }
+.tree .detail.learned .title { fill: var(--text); }
+.tree .detail.locked .title { opacity: .75; }
 .tree-panel .hint { position: absolute; left: 12px; top: 12px; z-index: 1; color: var(--muted); font-size: 12px; background: rgba(13, 18, 25, .8); padding: 5px 9px; border-radius: 3px; border: 1px solid var(--line); pointer-events: none; }
 .tree-panel .zoom { position: absolute; right: 12px; top: 12px; z-index: 1; display: flex; flex-direction: column; gap: 6px; }
 .tree-panel .zoom button { width: 34px; height: 34px; background: rgba(13, 18, 25, .92); border: 1px solid var(--line-2); color: var(--gold-2); font-size: 17px; border-radius: 3px; cursor: pointer; }
