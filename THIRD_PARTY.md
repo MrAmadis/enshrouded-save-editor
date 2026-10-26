@@ -97,3 +97,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Enshrouded's game icon (Keen Games)
+
+- **What we use:** `src/EnshroudedSaveEditor.App/app.ico`, the application's icon, is the icon of `enshrouded.exe` recoloured: the stone tablet in bronze and the Flame sigil in the editor's pale gold (owner's choice, 2026-10-26). Each size was recoloured from the game's own image at that size.
+- **License:** the artwork belongs to Keen Games. It is used here only as the icon of this personal, unpublished tool, and is the one piece of game content committed to this repo (owner's decision, 2026-10-26).

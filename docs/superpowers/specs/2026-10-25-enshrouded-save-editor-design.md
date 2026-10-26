@@ -176,7 +176,7 @@ The layout below comes from Kimikozi's `pc.js`. The points marked verified were 
 - **Rewards:** the table of skill-point rewards.
 - **Levels:** the level cap and the XP-per-level table.
 
-**Plan: read it from the install at runtime**, the same principle as Stoneshard. It stays correct after patches, and no game content is committed.
+**Plan: read it from the install at runtime**, the same principle as Stoneshard. It stays correct after patches, and no game content is committed (one exception, by the owner's decision: the app icon is the game's icon recoloured, see THIRD_PARTY.md).
 - `enshrouded.kfc` is the game's resource database, with `enshrouded.kfc_resources` and the `.dat` files beside it.
 - **[Brabb3l/kfc-parser](https://github.com/Brabb3l/kfc-parser)** (Rust, **GPL-3.0**) exports and unpacks these files. v0.2.0 was released 2026-10-16, a day after 1.0. It is the reference for the format. Don't copy its code into this repo, because of its licence; study it and implement in C#. *(my call)*
 - **Icons are not proven yet.** Textures sit in the `.dat` files, probably GPU block-compressed. If icon extraction can't be made to work, fall back to category glyphs like the mockup's line icons, and tell the owner. *(my call)*

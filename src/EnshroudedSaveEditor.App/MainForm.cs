@@ -18,6 +18,10 @@ internal sealed class MainForm : Form
     public MainForm()
     {
         Text = "Enshrouded Save Editor";
+        // The exe's own icon (app.ico), for the title bar and the taskbar button; every size it holds.
+        using (var icon = typeof(MainForm).Assembly.GetManifestResourceStream("app.ico"))
+            if (icon is not null)
+                Icon = new Icon(icon);
         ClientSize = new Size(1440, 900);
         MinimumSize = new Size(1100, 720);
         BackColor = Color.FromArgb(0x0b, 0x0f, 0x14);
