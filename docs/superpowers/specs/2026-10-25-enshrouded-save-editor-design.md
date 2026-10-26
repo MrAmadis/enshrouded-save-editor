@@ -238,6 +238,7 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
   - Lowering the level below what learned skills cost shows the overspend in red, and Save asks the user to refund skills first *(owner approved this guess; Unlimited was dropped, §10.5)*.
 - **XP:** editable, shown against the next level's requirement once the XP table and its meaning are known (§10).
 - **Points summary:** read-only, the same numbers as the Skills tab.
+- **Size** (owner, 2026-10-26): grows with the window against the default 1440 × 900 one (about 1.6× on 2560 × 1440), but doesn't fill it and never shrinks.
 
 ### 8.4 Inventory tab (`inventory-and-picker.html`, top)
 

@@ -37,6 +37,7 @@ public sealed class ShellTests : IDisposable
 
     EditorService Start(Func<string?>? pick = null, string? root = null)
     {
+        _ctx.JSInterop.Mode = JSRuntimeMode.Loose;                      // fit.js: no browser here
         var options = new EditorOptions([root ?? _root], _appData, _probe, pick);
         var editor = new EditorService(options, new GameDataProvider(ReferenceGameData.Load), new IconService(options.IconCacheRoot));
         _ctx.Services.AddSingleton(editor);

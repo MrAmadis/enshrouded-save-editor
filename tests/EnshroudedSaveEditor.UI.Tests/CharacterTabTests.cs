@@ -26,6 +26,7 @@ public sealed class CharacterTabTests : IDisposable
     // character2: Amadis, level 7, 12 from levels + 10 from rewards, 22 spent, 0 available.
     EditorService Start(int character = 2)
     {
+        _ctx.JSInterop.Mode = JSRuntimeMode.Loose;                      // fit.js: no browser here
         var options = new EditorOptions([_root], _appData, new EditorServiceTests.FakeProbe(), null);
         var editor = new EditorService(options, new GameDataProvider(ReferenceGameData.Load), new IconService(options.IconCacheRoot));
         _ctx.Services.AddSingleton(editor);
@@ -36,6 +37,22 @@ public sealed class CharacterTabTests : IDisposable
 
     static string Value(IRenderedComponent<CharacterTab> cut, string label) =>
         cut.Find($".points [data-points='{label}']").TextContent.Trim();
+
+    // Owner, 2026-10-26: the tab scales with the window like the inventory, but doesn't fill it: fit.js "window" mode
+    // scales by the window's size against the default one, never below today's size.
+    [Fact]
+    public async Task The_tab_scales_with_the_window()
+    {
+        Start();
+        var fit = _ctx.JSInterop.SetupModule("./_content/EnshroudedSaveEditor.UI/fit.js");
+        fit.Mode = JSRuntimeMode.Loose;
+        _ctx.Render<CharacterTab>();
+
+        var attach = Assert.Single(fit.Invocations["attach"]);
+        Assert.Equal("window", attach.Arguments[1]);
+        await _ctx.DisposeComponentsAsync();
+        Assert.Single(fit.Invocations["detach"]);
+    }
 
     [Fact]
     public void Shows_the_character_and_the_points_summary()

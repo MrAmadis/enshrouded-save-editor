@@ -1,11 +1,13 @@
-@implements IDisposable
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
 @inject EditorService EditorService
+@inject IJSRuntime JS
 
 @{
     var s = EditorService.Current;
     var p = s.Points;
 }
-<div class="character-tab">
+<div class="character-tab" @ref="_tab">
     <section class="panel">
         <h3>Character</h3>
         <label class="field-row">
@@ -65,11 +67,43 @@
     private string? _levelError;
     private string? _xpError;
 
+    private ElementReference _tab;
+    private IJSObjectReference? _fit;
+
     protected override void OnInitialized() => EditorService.Changed += OnChanged;
+
+    /// <summary>The tab grows with the window (fit.js "window" mode), but doesn't fill it.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        try
+        {
+            _fit = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/EnshroudedSaveEditor.UI/fit.js");
+            await _fit.InvokeVoidAsync("attach", _tab, "window");
+        }
+        catch (JSException)
+        {
+            // The tab still works, at its natural size.
+        }
+    }
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => EditorService.Changed -= OnChanged;
+    public async ValueTask DisposeAsync()
+    {
+        EditorService.Changed -= OnChanged;
+        if (_fit is null)
+            return;
+        try
+        {
+            await _fit.InvokeVoidAsync("detach", _tab);
+            await _fit.DisposeAsync();
+        }
+        catch (Exception e) when (e is JSDisconnectedException or JSException or ObjectDisposedException)
+        {
+        }
+    }
 
     private void OnName(ChangeEventArgs e)
     {

@@ -1,8 +1,10 @@
 // Scales a screen to the window with CSS zoom, keeping its proportions (owner, 2026-10-26: "resize everything to fit
 // the window size"). "fill": the element grows or shrinks to its parent's width and the window's height below its top.
-// "dialog": it takes up to 96 % by 92 % of the window. Blazor calls update after each render; a window resize does too.
+// "dialog": it takes up to 96 % by 92 % of the window. "window": it grows with the window against the default one
+// (MainForm's 1440 by 900) and never shrinks, for a screen too small to fill the window with (owner: "not fit the whole
+// screen"). Blazor calls update after each render; a window resize does too.
 const tracked = new Map();
-const MIN_ZOOM = 0.5, MAX_ZOOM = 4;
+const MIN_ZOOM = 0.5, MAX_ZOOM = 4, BASE_W = 1440, BASE_H = 900;
 
 function room(el, mode) {
     if (mode === "dialog") return { w: innerWidth * 0.96, h: innerHeight * 0.92 };
@@ -16,6 +18,10 @@ function room(el, mode) {
 export function update(el) {
     const mode = tracked.get(el);
     if (!mode) return;
+    if (mode === "window") {
+        el.style.zoom = Math.min(MAX_ZOOM, Math.max(1, Math.min(innerWidth / BASE_W, innerHeight / BASE_H))).toFixed(3);
+        return;
+    }
     el.style.zoom = "1";                                   // measure the natural size
     const size = el.getBoundingClientRect(), r = room(el, mode);
     if (size.width <= 0 || size.height <= 0) return;
