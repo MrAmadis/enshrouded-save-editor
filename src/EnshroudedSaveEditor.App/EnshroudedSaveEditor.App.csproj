@@ -40,4 +40,11 @@
            Text="No static web assets to bundle: the .NET SDK's publish targets changed. Update BundleStaticWebAssets in this project." />
   </Target>
 
+  <!-- The SDK still copies those assets loose beside the exe (wwwroot\ and the endpoints manifest). The exe carries them
+       and extracts them on first run, so the loose copies go: a single-file publish leaves the exe alone. -->
+  <Target Name="RemoveLooseStaticWebAssets" AfterTargets="Publish" Condition="'$(PublishSingleFile)' == 'true'">
+    <RemoveDir Directories="$(PublishDir)wwwroot" />
+    <Delete Files="$(PublishDir)$(AssemblyName).staticwebassets.endpoints.json" />
+  </Target>
+
 </Project>
