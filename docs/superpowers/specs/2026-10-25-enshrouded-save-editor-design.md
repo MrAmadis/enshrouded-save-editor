@@ -255,6 +255,7 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
   - **For now that is a swap only:** an item replaces the equipped item of its kind, and that item goes where the new one was. Equipping into an empty slot and unequipping change the Equipped mask, and when the game changes its byte 2 alongside isn't known yet (§10.3). Until session B settles it, they are refused with a message.
   - A smaller backpack can't be swapped in while its extension would leave items outside the grid.
 - Records that aren't shown (customization, unknown) are carried through untouched.
+- **Size** (owner, 2026-10-26): the whole tab scales with the window, keeping its proportions, as large as fits without scrolling (it also shrinks for a small window). The Add item dialog scales the same way.
 
 ### 8.5 Add item (`inventory-and-picker.html`, bottom)
 
@@ -277,6 +278,7 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
 - **Main area:** the real tree at the game's positions, with links and the 12 archetype labels.
   - **Node states:** learned (filled, glowing, in its class colour), can learn next (coloured outline), locked (dim).
   - Shape reflects type: abilities are diamonds; attributes and passives are circles of different sizes.
+  - **Zoomed in (2× and closer; owner, 2026-10-26):** abilities show their picture from the install (the game has none for other nodes); attribute nodes show the attribute they raise (STR, DEX, INT, CON, SPI, END); skills with 3 ranks show learned/max (2/3) under the node.
 - **Navigation** (owner): wheel zoom at the cursor, drag to pan, + / − / Fit buttons with a zoom readout, and click an archetype name to glide there. **Find a skill** flies to the match and highlights it.
 - **Hover card:** name, rank (n/max), cost, description, and what a click will do.
 - **Click:** learn → rank up (for 3-rank nodes) → unlearn. **Undo** reverses the last change.

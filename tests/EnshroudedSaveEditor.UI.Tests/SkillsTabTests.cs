@@ -253,6 +253,35 @@ public sealed class SkillsTabTests : IDisposable
         Assert.Equal("Nothing to undo", cut.Find(".skills-error").TextContent.Trim());
     }
 
+    // Owner, 2026-10-26: the game's picture where it has one, the attribute an attribute node raises, and learned/max
+    // ranks on skills with more than one rank. They sit in a .detail group that skilltree.js shows once zoomed in.
+    [Fact]
+    public void Nodes_show_their_picture_attribute_and_ranks()
+    {
+        _ctx.JSInterop.Mode = JSRuntimeMode.Loose;
+        SkillNodeView Node(uint id, SkillNodeType type, int rank, int maxRank, NodeState state, double x, string? attribute = null,
+            string? picture = null) =>
+            new(id, $"Node {id}", "", type, SkillClass.Warrior, 1, rank, maxRank, state, x, 0, attribute, picture);
+        IReadOnlyList<SkillNodeView> nodes =
+        [
+            Node(1, SkillNodeType.Ability, 2, 3, NodeState.Learned, 0, picture: "pic://bash"),
+            Node(2, SkillNodeType.Attribute, 1, 1, NodeState.Learned, 10, attribute: "STR"),
+            Node(3, SkillNodeType.Passive, 0, 3, NodeState.Available, 20),
+            Node(4, SkillNodeType.Passive, 1, 1, NodeState.Learned, 30),
+            Node(5, SkillNodeType.Ability, 0, 1, NodeState.Locked, 40),
+        ];
+        var cut = _ctx.Render<SkillTree>(p => p.Add(t => t.Nodes, nodes).Add(t => t.Links, []).Add(t => t.Labels, []));
+
+        var picture = cut.Find("svg.tree .detail image.pic");
+        Assert.Equal("pic://bash", picture.GetAttribute("href"));
+        Assert.Contains("learned", picture.ParentElement!.ClassList);
+        Assert.Equal("STR", cut.Find("svg.tree .detail .attr").TextContent);
+        Assert.Equal(["2/3", "0/3"], cut.FindAll("svg.tree .detail .rank").Select(t => t.TextContent));
+        Assert.Equal(3, cut.FindAll("svg.tree .detail").Count);            // nodes 4 and 5 have nothing to add
+        Assert.Contains("pic", cut.Find("svg.tree rect.nd[data-id='1']").ClassList);
+        Assert.Equal(5, cut.FindAll("svg.tree .nd").Count);
+    }
+
     [Fact]
     public void There_is_no_unlimited_control()
     {

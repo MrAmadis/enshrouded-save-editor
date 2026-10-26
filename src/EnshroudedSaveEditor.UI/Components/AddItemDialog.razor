@@ -1,6 +1,9 @@
 @* The Add item browser: categories on the left, search, rarity chips and item tiles in the middle, and what to add on
    the right. It adds through the editor service and reports the new stack's slot, so the tab can select it. *@
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
 @inject EditorService EditorService
+@inject IJSRuntime JS
 
 @{
     var s = EditorService.Current;
@@ -10,7 +13,7 @@
     var goesTo = Target is { } t ? ItemText.Where(s, t) : noRoom ? InventoryEditor.NoRoom : $"Backpack · first empty slot ({firstFree + 1})";
 }
 <div class="dialog-backdrop">
-    <div class="dialog panel add-dialog" role="dialog" aria-label="Add item">
+    <div class="dialog panel add-dialog" role="dialog" aria-label="Add item" @ref="_dialog">
         <div class="dialog-bar">
             <h3>Add item</h3>
             <div class="spacer"></div>
@@ -164,6 +167,39 @@
     private int _level = 1;
     private Rarity _pickRarity;
     private string? _error;
+
+    private ElementReference _dialog;
+    private IJSObjectReference? _fit;
+
+    /// <summary>The dialog scales with the window (fit.js); its own size doesn't change, so one hand-over is enough.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        try
+        {
+            _fit = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/EnshroudedSaveEditor.UI/fit.js");
+            await _fit.InvokeVoidAsync("attach", _dialog, "dialog");
+        }
+        catch (JSException)
+        {
+            // The dialog still works, at its natural size.
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_fit is null)
+            return;
+        try
+        {
+            await _fit.InvokeVoidAsync("detach", _dialog);
+            await _fit.DisposeAsync();
+        }
+        catch (Exception e) when (e is JSDisconnectedException or JSException or ObjectDisposedException)
+        {
+        }
+    }
 
     protected override void OnInitialized()
     {

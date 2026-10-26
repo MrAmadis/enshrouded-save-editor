@@ -508,6 +508,40 @@ public sealed class EditorServiceTests : IDisposable
         Assert.Equal(("Xena", 0u, 10), (v.Name, v.Xp, v.Level));
     }
 
+    // Owner, 2026-10-26: the tree shows which attribute a node raises, and the game's picture where it has one.
+    [Fact]
+    public void Attribute_nodes_name_the_attribute_they_raise()
+    {
+        var v = Start().Open(C(2));
+        SkillNodeView Named(string name) => v.Nodes.First(n => n.Name == name);
+
+        Assert.Equal(["STR", "DEX", "INT", "CON", "SPI", "END"],
+            new[] { "Strength", "Dexterity", "Intelligence", "Constitution", "Spirit", "Endurance" }.Select(n => Named(n).Attribute));
+        // "Gain one point of Spirit for every two levels of the Flame." and the like
+        Assert.Equal(("SPI", "STR", "DEX"), (Named("Arcane Concentration").Attribute, Named("Barbarian").Attribute, Named("Graceful Stride").Attribute));
+        Assert.All(v.Nodes, n => Assert.Equal(n.Type == SkillNodeType.Attribute, n.Attribute is not null));
+    }
+
+    /// <summary>Like the install: a picture for abilities only.</summary>
+    sealed class AbilityTextures(IGameData game) : IIconTextureSource
+    {
+        public string Version => "test";
+        public IconTexture? ItemTexture(uint id) => null;
+        public IconTexture? SkillTexture(uint nodeId) =>
+            game.Tree.Find(nodeId)?.Type == SkillNodeType.Ability ? new IconTexture(1, 1, [255, 255, 255, 255]) : null;
+    }
+
+    [Fact]
+    public void Nodes_carry_the_installs_picture_where_it_has_one()
+    {
+        var options = new EditorOptions([_root], _appData, _probe, null);
+        var icons = new IconService(options.IconCacheRoot, new AbilityTextures(_game));
+        var v = new EditorService(options, new GameDataProvider(ReferenceGameData.Load), icons).Open(C(2));
+
+        Assert.All(v.Nodes, n => Assert.Equal(n.Type == SkillNodeType.Ability ? $"https://icons.ese/skill/{n.Id:x8}.png" : null, n.Picture));
+        Assert.All(Start().Open(C(2)).Nodes, n => Assert.Null(n.Picture));   // no install: no pictures
+    }
+
     [Fact]
     public void Skill_edits_follow_the_game_rules_and_log_one_line_each()
     {

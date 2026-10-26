@@ -21,6 +21,7 @@ public sealed class InventoryTabTests : IDisposable
     const uint LesserRingOfHealth = 0x3993797a;   // character2 Equipped position 10
     const uint AlchemistHat = 0xe5a9ac59;         // character2 Equipped position 5
     const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
+    const string FitModule = "./_content/EnshroudedSaveEditor.UI/fit.js";
 
     readonly string _root = Fixtures.CopyToTemp();
     readonly string _appData = Path.Combine(Path.GetTempPath(), "enshrouded-appdata-" + Guid.NewGuid().ToString("N"));
@@ -38,6 +39,7 @@ public sealed class InventoryTabTests : IDisposable
     // Scorching Wand at 16 (level 11, Legendary, 352/363), Health Potion ×9 of 20 at 22, Fireball I ×87 of 500 at 30.
     EditorService Start(int character = 2)
     {
+        _ctx.JSInterop.Mode = JSRuntimeMode.Loose;                      // fit.js: no browser here
         var options = new EditorOptions([_root], _appData, new EditorServiceTests.FakeProbe(), null);
         var editor = new EditorService(options, new GameDataProvider(ReferenceGameData.Load), new IconService(options.IconCacheRoot));
         _ctx.Services.AddSingleton(editor);
@@ -67,6 +69,26 @@ public sealed class InventoryTabTests : IDisposable
         var backups = Path.Combine(Path.GetTempPath(), "enshrouded-plant-" + Guid.NewGuid().ToString("N"));
         _dirs.Add(backups);
         Assert.Equal(SaveResult.Saved, s.Save(new BackupService(backups), new EditorServiceTests.FakeProbe()));
+    }
+
+    // Owner, 2026-10-26: the inventory scales to fill the window. fit.js does the measuring; the tab hands it the element
+    // once, has it measure again after every render (selection, banners, a new backpack), and lets go when it closes.
+    [Fact]
+    public async Task The_inventory_is_fitted_to_the_window()
+    {
+        Start();
+        var fit = _ctx.JSInterop.SetupModule(FitModule);
+        fit.SetupVoid("attach", _ => true).SetVoidResult();
+        fit.SetupVoid("update", _ => true).SetVoidResult();
+        fit.SetupVoid("detach", _ => true).SetVoidResult();
+        var cut = _ctx.Render<InventoryTab>();
+
+        var attach = Assert.Single(fit.Invocations["attach"]);
+        Assert.Equal("fill", attach.Arguments[1]);
+        cut.Find(Slot(Inv(30))).Click();
+        Assert.NotEmpty(fit.Invocations["update"]);
+        await _ctx.DisposeComponentsAsync();
+        Assert.Single(fit.Invocations["detach"]);
     }
 
     [Fact]

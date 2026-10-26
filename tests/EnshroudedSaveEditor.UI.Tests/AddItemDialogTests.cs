@@ -33,6 +33,7 @@ public sealed class AddItemDialogTests : IDisposable
     // character2: Amadis level 7, an empty backpack of 40 slots (Inventory 0–15, 32–39, Extra 0–15).
     EditorService Start(int character = 2)
     {
+        _ctx.JSInterop.Mode = JSRuntimeMode.Loose;                      // fit.js: no browser here
         var options = new EditorOptions([_root], _appData, new EditorServiceTests.FakeProbe(), null);
         var editor = new EditorService(options, new GameDataProvider(ReferenceGameData.Load), new IconService(options.IconCacheRoot));
         _ctx.Services.AddSingleton(editor);
@@ -121,6 +122,20 @@ public sealed class AddItemDialogTests : IDisposable
         Assert.NotEmpty(cut.FindAll(".add-dialog .tile"));
         cut.FindAll(".add-dialog .rarities .chip").Single(c => c.TextContent.Trim() == "Legendary").Click();
         Assert.Contains(cut.FindAll(".add-dialog .tile"), t => t.GetAttribute("data-rarity") != "Legendary");
+    }
+
+    // Owner, 2026-10-26: the Add item dialog scales with the window too (fit.js, "dialog": a share of the window).
+    [Fact]
+    public void The_dialog_is_fitted_to_the_window()
+    {
+        Start();
+        var fit = _ctx.JSInterop.SetupModule("./_content/EnshroudedSaveEditor.UI/fit.js");
+        fit.Mode = JSRuntimeMode.Loose;
+        var cut = OpenDialog();
+
+        Assert.Contains(fit.Invocations["attach"], i => (string?)i.Arguments[1] == "dialog");
+        cut.Find(".add-dialog button.close").Click();
+        Assert.Single(fit.Invocations["detach"]);                          // the dialog's; the inventory stays
     }
 
     [Fact]

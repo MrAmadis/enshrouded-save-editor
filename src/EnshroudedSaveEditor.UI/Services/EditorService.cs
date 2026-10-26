@@ -557,7 +557,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
 
         var nodes = data.Tree.Nodes
             .Select(n => new SkillNodeView(n.Id, n.Name, n.Description, n.Type, n.Class, n.Cost, skills.RankOf(n.Id), n.MaxRank,
-                skills.StateOf(n.Id), n.X, n.Y))
+                skills.StateOf(n.Id), n.X, n.Y, AttributeOf(n), icons.SkillPicture(n)))
             .ToList();
 
         var level = (int)s.Player.Level;
@@ -566,6 +566,23 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
             s.Player.InventoryStatus, equipped, backpack, hotbar, skills.Points(), nodes, data.Tree.Links, data.Tree.Labels,
             _log.Lines, _undo.Count > 0, XpToNextLevel(data, level), overflow);
     }
+
+    /// <summary>The attributes, by the word the game's text uses, with the tag the skill tree shows.</summary>
+    private static readonly (string Word, string Tag)[] Attributes =
+    [
+        ("Strength", "STR"), ("Dexterity", "DEX"), ("Intelligence", "INT"), ("Constitution", "CON"), ("Spirit", "SPI"),
+        ("Endurance", "END"),
+    ];
+
+    /// <summary>
+    /// The tag of the attribute an attribute node raises, named by the node ("Strength") or else by its text ("Gain one point
+    /// of Spirit for every two levels of the Flame."); null for other nodes.
+    /// </summary>
+    private static string? AttributeOf(SkillNode n) =>
+        n.Type != SkillNodeType.Attribute
+            ? null
+            : Attributes.FirstOrDefault(a => n.Name.Contains(a.Word, StringComparison.OrdinalIgnoreCase)).Tag
+              ?? Attributes.FirstOrDefault(a => n.Description.Contains(a.Word, StringComparison.OrdinalIgnoreCase)).Tag;
 
     /// <summary>R6: <c>XpPerLevel[level − 1]</c>; null without a table, past its end, or at the cap.</summary>
     private static uint? XpToNextLevel(IGameData data, int level) =>

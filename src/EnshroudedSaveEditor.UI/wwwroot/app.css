@@ -324,7 +324,8 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .slot[draggable="true"] { cursor: grab; }
 
 /* Inventory tab */
-.inventory { display: grid; grid-template-columns: 236px auto 286px; gap: 14px; justify-content: center; align-items: start; }
+/* Scaled to fill the window by fit.js (CSS zoom), so it shrink-wraps its columns and centres itself. */
+.inventory { display: grid; grid-template-columns: 236px auto 286px; gap: 14px; justify-content: center; align-items: start; width: max-content; margin: 0 auto; }
 .inventory .panel { padding: 12px; }
 .ph { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .ph h4 { margin: 0; font-family: Cinzel, Georgia, serif; font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform: uppercase; font-weight: 500; }
@@ -380,6 +381,8 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
     display: flex;
     flex-direction: column;
 }
+/* With fit.js: a fixed size, scaled (CSS zoom) to 96 % by 92 % of the window. */
+.dialog.add-dialog.fitted { width: 1180px; height: 780px; }
 .dialog-bar { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--line); }
 .dialog-bar h3 { margin: 0; font-size: 14px; letter-spacing: .14em; color: var(--gold-2); }
 .add-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 210px 1fr 286px; }
@@ -453,6 +456,19 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .tree .nd.available { fill: #121821; stroke: var(--c); stroke-width: 1.6; }
 .tree .nd.learned { fill: var(--c); stroke: #fff6dc; stroke-width: .8; filter: drop-shadow(0 0 4px var(--c)); }
 .tree .selring { fill: none; stroke: var(--gold-2); stroke-width: 1.6; stroke-dasharray: 3 2; pointer-events: none; }
+/* Node details, shown once zoomed in (skilltree.js sets .near): picture, attribute tag, learned/max ranks. */
+.tree .detail { display: none; pointer-events: none; }
+.tree.near .detail { display: inline; }
+.tree.near .nd.learned.pic { fill: #1d2430; stroke: var(--c); stroke-width: 1.6; }
+.tree .detail.available .pic { opacity: .6; }
+.tree .detail.locked .pic { opacity: .3; }
+.tree .attr { font-family: "Source Sans 3", sans-serif; font-size: 2.6px; font-weight: 700; text-anchor: middle; fill: #1a0f08; }
+.tree .detail.available .attr { fill: var(--dim); }
+.tree .detail.locked .attr { fill: var(--muted); }
+.tree .rank-tag { fill: #0b0f14; stroke: var(--line-2); stroke-width: .8; vector-effect: non-scaling-stroke; }
+.tree .detail.learned .rank-tag { stroke: var(--c); }
+.tree .rank { font-family: "Source Sans 3", sans-serif; font-size: 2.6px; text-anchor: middle; fill: var(--dim); }
+.tree .detail.learned .rank { fill: var(--gold-2); }
 .tree-panel .hint { position: absolute; left: 12px; top: 12px; z-index: 1; color: var(--muted); font-size: 12px; background: rgba(13, 18, 25, .8); padding: 5px 9px; border-radius: 3px; border: 1px solid var(--line); pointer-events: none; }
 .tree-panel .zoom { position: absolute; right: 12px; top: 12px; z-index: 1; display: flex; flex-direction: column; gap: 6px; }
 .tree-panel .zoom button { width: 34px; height: 34px; background: rgba(13, 18, 25, .92); border: 1px solid var(--line-2); color: var(--gold-2); font-size: 17px; border-radius: 3px; cursor: pointer; }

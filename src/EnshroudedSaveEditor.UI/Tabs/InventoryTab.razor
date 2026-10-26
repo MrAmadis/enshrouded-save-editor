@@ -1,6 +1,8 @@
-@implements IDisposable
+@using Microsoft.JSInterop
+@implements IAsyncDisposable
 @inject EditorService EditorService
 @inject IAssetUrls AssetUrls
+@inject IJSRuntime JS
 
 @{
     var s = EditorService.Current;
@@ -10,6 +12,7 @@
     var canMove = !s.ReadOnly && s.Inventory == InventoryStatus.Full;
     var moveOff = s.ReadOnly ? $"This save is read-only: {s.ReadOnlyReason}" : canMove ? null : InventoryEditor.NeedsFull;
     var selected = SelectedSlot(s);
+    _shown = s.Inventory != InventoryStatus.NotFound;
 }
 @if (s.Inventory == InventoryStatus.NotFound)
 {
@@ -26,7 +29,7 @@ else
         <Banner Kind="error">@_error</Banner>
     }
 
-    <div class="inventory">
+    <div class="inventory" @ref="_inventory">
         <section class="panel equipped">
             <div class="ph"><h4>Equipped</h4></div>
             <div class="equip">
@@ -199,7 +202,34 @@ else
     private bool _adding;
     private ItemRef? _addTarget;
 
+    private const string FitModule = "./_content/EnshroudedSaveEditor.UI/fit.js";
+    private ElementReference _inventory;
+    private IJSObjectReference? _fit;
+    private bool _shown, _fitted;
+
     protected override void OnInitialized() => EditorService.Changed += OnChanged;
+
+    /// <summary>The inventory fills the window (fit.js): handed over once, then measured again after every render.</summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_shown)
+            return;
+        try
+        {
+            _fit ??= await JS.InvokeAsync<IJSObjectReference>("import", FitModule);
+            if (_fitted)
+            {
+                await _fit.InvokeVoidAsync("update", _inventory);
+                return;
+            }
+            await _fit.InvokeVoidAsync("attach", _inventory, "fill");
+            _fitted = true;
+        }
+        catch (JSException)
+        {
+            // The inventory still works, at its natural size.
+        }
+    }
 
     /// <summary>Any change (an accepted edit here or elsewhere, undo, reload, restore) drops the last refusal's message.</summary>
     private void OnChanged()
@@ -208,7 +238,21 @@ else
         InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose() => EditorService.Changed -= OnChanged;
+    public async ValueTask DisposeAsync()
+    {
+        EditorService.Changed -= OnChanged;
+        if (_fit is null)
+            return;
+        try
+        {
+            if (_fitted)
+                await _fit.InvokeVoidAsync("detach", _inventory);
+            await _fit.DisposeAsync();
+        }
+        catch (Exception e) when (e is JSDisconnectedException or JSException or ObjectDisposedException)
+        {
+        }
+    }
 
     private static EquipPosition Position(SlotView slot) => InventoryLayout.EquipPositions[slot.Ref.Slot];
 

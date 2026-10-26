@@ -23,11 +23,16 @@
         var style = $"--c:{Colour(n.Class)}";
         if (n.Type == SkillNodeType.Ability)
         {
-            <rect x="@F(x - 6.2)" y="@F(y - 6.2)" width="12.4" height="12.4" transform="rotate(45 @F(x) @F(y))" class="@cls" style="@style" data-id="@n.Id" />
+            <rect x="@F(x - 6.2)" y="@F(y - 6.2)" width="12.4" height="12.4" transform="rotate(45 @F(x) @F(y))"
+                  class="@(n.Picture is null ? cls : cls + " pic")" style="@style" data-id="@n.Id" />
         }
         else
         {
             <circle cx="@F(x)" cy="@F(y)" r="@F(Radius(n.Type))" class="@cls" style="@style" data-id="@n.Id" />
+        }
+        @if (n.Picture is not null || n.Attribute is not null || n.MaxRank > 1)
+        {
+            @Detail(n, x, y)
         }
     }
     @if (Selected is { } sel && pos.TryGetValue(sel, out var sp))
@@ -121,6 +126,56 @@
         b.AddAttribute(3, "class", "lab");
         b.AddAttribute(4, "style", $"fill:{Colour(l.Class)}");
         b.AddContent(5, l.Name);
+        b.CloseElement();
+    };
+
+    // What a node adds once zoomed in (skilltree.js sets "near"): the game's picture, the attribute it raises, and
+    // learned/max ranks for a skill with more than one rank. Built by hand for the same reason as Label.
+    private const double PictureSize = 9, AbilityReach = 8.8, TagWidth = 7.6, TagHeight = 3.8;
+
+    private RenderFragment Detail(SkillNodeView n, double x, double y) => b =>
+    {
+        b.OpenElement(0, "g");
+        b.AddAttribute(1, "class", $"detail {StateClass(n.State)}");
+        b.AddAttribute(2, "style", $"--c:{Colour(n.Class)}");
+        if (n.Picture is { } picture)
+        {
+            b.OpenElement(3, "image");
+            b.AddAttribute(4, "class", "pic");
+            b.AddAttribute(5, "href", picture);
+            b.AddAttribute(6, "x", F(x - PictureSize / 2));
+            b.AddAttribute(7, "y", F(y - PictureSize / 2));
+            b.AddAttribute(8, "width", F(PictureSize));
+            b.AddAttribute(9, "height", F(PictureSize));
+            b.CloseElement();
+        }
+        if (n.Attribute is { } attribute)
+        {
+            b.OpenElement(10, "text");
+            b.AddAttribute(11, "class", "attr");
+            b.AddAttribute(12, "x", F(x));
+            b.AddAttribute(13, "y", F(y + 0.9));
+            b.AddContent(14, attribute);
+            b.CloseElement();
+        }
+        if (n.MaxRank > 1)
+        {
+            var top = y + (n.Type == SkillNodeType.Ability ? AbilityReach : Radius(n.Type)) + 1;
+            b.OpenElement(15, "rect");
+            b.AddAttribute(16, "class", "rank-tag");
+            b.AddAttribute(17, "x", F(x - TagWidth / 2));
+            b.AddAttribute(18, "y", F(top));
+            b.AddAttribute(19, "width", F(TagWidth));
+            b.AddAttribute(20, "height", F(TagHeight));
+            b.AddAttribute(21, "rx", F(TagHeight / 2));
+            b.CloseElement();
+            b.OpenElement(22, "text");
+            b.AddAttribute(23, "class", "rank");
+            b.AddAttribute(24, "x", F(x));
+            b.AddAttribute(25, "y", F(top + 2.85));
+            b.AddContent(26, $"{n.Rank}/{n.MaxRank}");
+            b.CloseElement();
+        }
         b.CloseElement();
     };
 

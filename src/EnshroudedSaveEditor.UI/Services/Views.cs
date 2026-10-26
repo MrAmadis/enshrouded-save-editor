@@ -35,9 +35,11 @@ public sealed record SlotView(ItemRef Ref, string? Label, ItemView? Item);
 
 /// <param name="Rank">0 when not learned (rank-0 entries count as not learned).</param>
 /// <param name="State">Sparks are always <see cref="NodeState.Learned"/>.</param>
+/// <param name="Attribute">For an attribute node, the attribute it raises: "STR", "DEX", "INT", "CON", "SPI" or "END".</param>
+/// <param name="Picture">The node's own picture from the install (abilities have one); null when it has none.</param>
 public sealed record SkillNodeView(
     uint Id, string Name, string Description, SkillNodeType Type, SkillClass Class, int Cost, int Rank, int MaxRank, NodeState State,
-    double X, double Y);
+    double X, double Y, string? Attribute, string? Picture);
 
 /// <summary>The open character.</summary>
 /// <param name="Equipped">The 16 Equipped positions in order (<see cref="InventoryLayout.EquipPositions"/>).</param>

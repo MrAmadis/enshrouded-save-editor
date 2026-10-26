@@ -39,10 +39,13 @@ public sealed class IconService(string iconCacheRoot, IIconTextureSource? textur
     public string ItemIcon(uint id, ItemInfo? info) =>
         Texture(ItemFolder, id, t => t.ItemTexture(id)) ?? Glyph(CategoryGlyphs.ForItem(info));
 
-    public string SkillIcon(SkillNode node)
+    public string SkillIcon(SkillNode node) => SkillPicture(node) ?? Glyph(CategoryGlyphs.ForSkill(node.Type));
+
+    /// <summary>The node's own picture from the install (only abilities have one); null instead of a glyph.</summary>
+    public string? SkillPicture(SkillNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
-        return Texture(SkillFolder, node.Id, t => t.SkillTexture(node.Id)) ?? Glyph(CategoryGlyphs.ForSkill(node.Type));
+        return Texture(SkillFolder, node.Id, t => t.SkillTexture(node.Id));
     }
 
     /// <summary>What an empty Equipped position shows.</summary>

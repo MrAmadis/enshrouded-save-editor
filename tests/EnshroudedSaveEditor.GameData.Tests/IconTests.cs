@@ -145,6 +145,23 @@ public sealed class IconTests(InstallIconsFixture install) : IClassFixture<Insta
         }
     }
 
+    // The skill tree draws a node's own picture only; a glyph is no picture.
+    [Fact]
+    public void A_skill_picture_is_the_nodes_install_icon_or_none()
+    {
+        var textures = new FakeTextures();
+        var ability = Reference.Tree.Nodes.First(n => n.Type == SkillNodeType.Ability);
+        var passive = Reference.Tree.Nodes.First(n => n.Type == SkillNodeType.Passive);
+        textures.Missing.Add(passive.Id);
+        var icons = new IconService(_cache, textures);
+
+        Assert.Equal($"https://icons.ese/skill/{ability.Id:x8}.png", icons.SkillPicture(ability));
+        Assert.True(File.Exists(FileFor(icons.SkillPicture(ability)!)));
+        Assert.Null(icons.SkillPicture(passive));
+        Assert.StartsWith("https://icons.ese/glyph/", icons.SkillIcon(passive));
+        Assert.Null(new IconService(_cache).SkillPicture(ability));         // no install: no picture
+    }
+
     [Fact]
     public void Reference_items_get_install_icons()
     {
