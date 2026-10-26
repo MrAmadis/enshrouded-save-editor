@@ -114,6 +114,31 @@ What this settles:
 
 Not exercised in the captures (no shield, ward, gem or changed-level item was edited), so the walkthrough checks below stay open.
 
+## Leftover checks — 2026-10-26
+
+On "Leftover Checks" (local `character1.ksd`, a fresh copy of Steam character1; the earlier test characters were removed
+first). The editor's code, on the install's data, wrote: Pikemead's Bulwark (a lore shield, `Craft_Shield_T2_…`) swapped
+into the shield position; Ghostly Ward (`Ward_T2_Loot`) added; the three clubs whose level became 1–50 at level 30; Gem of
+Skulls at 80 and Gem of Agility at 105; Butter ×5. `watch` captures in `local-d/character1/`.
+
+| Check | Owner | The game's saves |
+|---|---|---|
+| Enshrouded started with the editor open, icons shown | No problem | – |
+| Lore shield in the shield position | Kept | Kept at position 12; durability recomputed (85 → 77) |
+| Added ward (flags `13`) | Normal; equipped in place of the lore shield | Kept; durability recomputed (85 → 60); equipped at 12 |
+| Clubs at 30 | Shown at 30 | Kept at 30; durability recomputed (381 → 335) |
+| Gems at 80 and 105 | Both shown at 55 | **Rewritten to 55** at the first save |
+| Butter | A consumable, edible | Eaten: ×5 → ×4 |
+
+What this settles:
+- **No item level goes past 55**, gems included, though their data range is 1–105. The editor now caps every level at 55
+  (`InventoryLayout.LevelRange`).
+- **Lore shields and wards belong in the shield position.** The install gives them the Shield slot; with only the reference
+  data (no slot for either), the editor now knows lore shields (`Craft_Shield_*`) by name, as it already knew wards.
+- **Ranged levels, new wards and Butter's category** from the install are right.
+- **The editor holding install files open** doesn't stop the game from starting.
+- The Shroud Meteor Scroll's fixed level doesn't matter in a save: it is a stack, and stacks carry no level field.
+
 ## Still open
 
 - ~~The in-game name box limit~~: 15 characters (owner, above).
@@ -125,12 +150,7 @@ Not exercised in the captures (no shield, ward, gem or changed-level item was ed
   3. Take off **only the backpack** (or another non-shield piece). Does byte 2 stay as it is?
   4. If 1–3 show byte 2 is independent of the gear positions: a Lab copy with one armour position emptied by the editor (record removed, mask bit cleared, byte 2 untouched). Does the game load it, show the slot empty, and keep the item in the backpack?
 - The meaning of the Equipped u16 values, the inventory header byte x (`01`/`02`), and the 22-byte tail.
-- **Left over from the final walkthrough (Task 21).** What the install's data (Tasks 19–20) changed, and what couldn't be tested here. Game checks go on a local copy.
-  - **Lore shields and wards:** the 11 `Craft_Shield_*` lore shields and the 12 `Ward_*` wards can now be swapped into the Shield position (12). Does the game keep the swap?
-  - **New wards** get level, durability and rarity (flags `0x13`, chosen by the install's Shield slot). Does the game load an added ward like one of its own?
-  - **Five items changed their fixed level:** the Enhanced Spiked, Mace-like and Iron Claw clubs (now 1–50) and the Gem of Skulls (now 1–105) can be levelled; the Shroud Meteor Scroll is now fixed at 20. Does the game keep these levels?
-  - **Butter** is now under Consumables (Materials in the reference). Is that where the game has it?
-  - **Gem levels above 55:** gems take 1–105, in the install and the reference alike. Does the game keep a gem written above 55?
+- **Left over from the final walkthrough (Task 21).** The rest were settled by the leftover checks (above).
   - **Icons after a game patch:** WebView2 may still show the old icons of the previous build. Do the new ones show after a game update?
   - **First launch on a cold disk:** about 0.4 s to read the install and 0.18 s for the first icon, both measured with a warm file cache. How long is it after a reboot?
-  - **Install files held open:** the editor keeps `enshrouded.kfc_resources` and the `.dat` files it read icons from open until it closes. With icons shown, can Enshrouded still start, and Steam still update it?
+  - **Steam updating the game while the editor is open** (it holds `enshrouded.kfc_resources` and some `.dat` files open; the game itself starts fine).

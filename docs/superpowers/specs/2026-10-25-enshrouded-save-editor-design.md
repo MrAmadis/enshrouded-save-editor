@@ -248,7 +248,7 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
   - Empty slots show a faint +, and clicking one opens Add item for that slot.
 - **Right: Selected panel.**
   - **Stack:** a stepper with typing, plus 1 / Half / Max chips. It is capped at the item's max stack from game data *(my guess, owner approved)*.
-  - **Gear:** level (within the item's range), rarity and durability.
+  - **Gear:** level (within the item's range, never past 55), rarity and durability.
     - **Fixed-level items** (game data min level = max level) show their level read-only. The game sets it to the base level plus upgrades and rewrites any other value (session B, `docs/research/in-game-findings.md`).
     - An item missing from the game data takes levels 1–55.
   - **Remove from backpack.**
@@ -349,7 +349,8 @@ Every item below is verified **in the real game**: edit the save, load it in Ens
    - Which optional fields does the game need on a fresh weapon or armour piece (level, durability, rarity, bits 2 and 3)? Compare with items the game itself created. **Settled:** the game kept the editor's field sets for a bow, an armour piece and a ring.
    - Does a stack above its max get clamped? The UI caps it anyway. **Settled:** yes, the game clamped Fireball I 600 to 500.
    - Does gear added straight to an equipped slot apply its stats? (The editor adds new items to the backpack only; they are equipped by a swap.) **Not applicable:** the editor never adds into Equipped.
-   - **Item levels, settled (session B):** the game sets the level of fixed-level gear (min level = max level) to its base plus upgrades and rewrites any other value; ranged items keep the written level. The editor follows this (§8.4), and the final walkthrough's Bow Of The Serpent, added at its base level, was kept.
+   - **Item levels, settled (session B):** the game sets the level of fixed-level gear (min level = max level) to its base plus upgrades and rewrites any other value; ranged items keep the written level. The editor follows this (§8.4), and the final walkthrough's Bow Of The Serpent, added at its base level, was kept. **No level goes past 55** (leftover checks): the game rewrote gems written at 80 and 105 to 55, though their data range is 1–105.
+   - **Lore shields and wards, settled (leftover checks):** the game keeps both in the shield position.
 5. **Skills:**
    - What do rank-0 entries mean? **Settled:** not learned, and not connected in the tree.
    - Does the game check paths or points on load? **Points, settled:** it resets an overspent tree (below). Paths weren't tested apart.

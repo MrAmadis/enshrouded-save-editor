@@ -16,8 +16,8 @@ public sealed record CharacterView(
 /// <param name="Rarity">The record's rarity, or else the item's base rarity (for the tint); null when neither is known.</param>
 /// <param name="MaxStack">The most a stack may hold: 1 to 65535 (65535 for an unknown item), as SetCount allows.</param>
 /// <param name="Level">The record's item level; null when it has no level field (then it can't be set).</param>
-/// <param name="MinLevel">The item's reference level range, the levels SetItemLevel allows; null for an unknown item
-/// (which allows 1 to <see cref="InventoryLayout.MaxItemLevel"/>).</param>
+/// <param name="MinLevel">The levels SetItemLevel allows (<see cref="InventoryLayout.LevelRange"/>: the item's range, up to
+/// 55); null for an unknown item (which allows 1 to <see cref="InventoryLayout.MaxItemLevel"/>).</param>
 /// <param name="FixedLevel">The game sets the level (<see cref="ItemInfo.FixedLevel"/>): <paramref name="MinLevel"/> plus
 /// upgrades. It can't be set.</param>
 /// <param name="Durability">Null when the record has no durability field.</param>
@@ -80,7 +80,8 @@ public sealed record SessionView(
 /// name for Equipment ("Helmet"; "None" for backpacks, wards and appearance pieces), and "" otherwise.</param>
 /// <param name="MaxStack">1 to 65535, as AddItem allows.</param>
 /// <param name="FixedLevel">The game sets the level (<see cref="ItemInfo.FixedLevel"/>), so a new one is added at
-/// <paramref name="MinLevel"/>; otherwise AddItem takes a level from <paramref name="MinLevel"/> to <paramref name="MaxLevel"/>.</param>
+/// <paramref name="MinLevel"/>; otherwise AddItem takes a level from <paramref name="MinLevel"/> to <paramref name="MaxLevel"/>
+/// (<see cref="InventoryLayout.LevelRange"/>: the item's range, up to 55).</param>
 /// <param name="Icon">Gives the icon's URL; asked only when the item is shown, because the first ask may extract the
 /// install's icon (the catalog holds every item).</param>
 /// <param name="InternalName">The game's own name ("Weapon_T1_2H_BowEpic_02"), which the browser's search also covers.</param>

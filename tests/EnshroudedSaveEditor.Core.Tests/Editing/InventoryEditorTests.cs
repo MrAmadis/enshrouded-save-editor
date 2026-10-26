@@ -36,6 +36,7 @@ public class InventoryEditorTests : IDisposable
     const uint TalionsBow = 0x9ecd0c33;         // Weapons/RangedBow, levels 1–50
     const uint BowOfTheSerpent21 = 0x1cf81b28;  // Weapons/RangedBow, levels 21–21: one of five items of that name
     const uint EagleEyeTrousers = 0x88a1302d;   // Equipment/Legs, levels 30–50
+    const uint GemOfStormsEye = 0xe52a5ac0;     // WeaponGem, levels 1–105 in the data; character1 Inventory 7, level 16
 
     const string NeedsFull = "Adding and moving items isn't available for this character yet";
     const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
@@ -208,9 +209,21 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(4, s.ChangeCount);
         Assert.Equal((byte)1, Records(Reparsed(s), ContainerKind.Inventory).Single(r => r.Slot == bow.Slot).Level);
 
-        var s1 = Open("character1.ksd"); var e1 = Ed(s1);
-        e1.SetItemLevel(Inv(7), 105);                              // Gem of Storm's Eye: levels 1–105, past the gear cap
-        Assert.Equal("The level must be between 1 and 105.", Rejected(() => e1.SetItemLevel(Inv(7), 106)).Message);
+    }
+
+    // Leftover checks, 2026-10-26: the game rewrote gems written at 80 and 105 to 55, though their data range is 1–105.
+    [Fact]
+    public void No_item_level_goes_past_55()
+    {
+        var s = Open("character1.ksd"); var e = Ed(s);
+        Assert.Equal((1, 105), (Item(GemOfStormsEye).MinLevel, Item(GemOfStormsEye).MaxLevel));
+        e.SetItemLevel(Inv(7), 55);                                // Gem of Storm's Eye, level 16
+        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.SetItemLevel(Inv(7), 56)).Message);
+        Assert.Equal("The level must be between 1 and 55.", Rejected(() => e.Add(Item(GemOfStormsEye), 1, 80, null, null)).Message);
+        Assert.Equal((1, 55), InventoryLayout.LevelRange(Item(GemOfStormsEye)));
+        Assert.Equal((1, 50), InventoryLayout.LevelRange(Item(TalionsBow)));
+        Assert.Equal((5, 5), InventoryLayout.LevelRange(Item(AlchemistHat)));          // fixed: its base only
+        Assert.Equal((1, 55), InventoryLayout.LevelRange(null));                       // missing from the game data
     }
 
     [Fact]

@@ -350,12 +350,19 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         lock (_lock)
             return _catalog ??= Data.Items.All
                 .Where(i => i.Category != ItemCategory.Customization)
-                .Select(i => new CatalogEntryView(i.Id, i.Name, i.Category, SubCategory(i), i.BaseRarity, MaxStack(i), i.MinLevel,
-                    i.MaxLevel, i.FixedLevel, () => icons.ItemIcon(i.Id, i), i.InternalName))
+                .Select(CatalogEntry)
                 .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(c => c.Id)
                 .ToList()
                 .AsReadOnly();
+    }
+
+    /// <summary>An item as the Add item browser lists it, with the levels it may take (<see cref="InventoryLayout.LevelRange"/>).</summary>
+    private CatalogEntryView CatalogEntry(ItemInfo i)
+    {
+        var (min, max) = InventoryLayout.LevelRange(i);
+        return new CatalogEntryView(i.Id, i.Name, i.Category, SubCategory(i), i.BaseRarity, MaxStack(i), min, max, i.FixedLevel,
+            () => icons.ItemIcon(i.Id, i), i.InternalName);
     }
 
     /// <summary>
@@ -603,9 +610,10 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         if (info?.Category == ItemCategory.Customization)
             return null;
         Rarity? own = rec.Rarity is { } r && Enum.IsDefined((Rarity)r.Rarity) ? (Rarity)r.Rarity : null;
+        (int Min, int Max)? levels = info is null ? null : InventoryLayout.LevelRange(info);
         return new ItemView(
             rec.ItemId, info?.Name ?? UnknownItem(rec.ItemId), info?.Category, own ?? info?.BaseRarity, rec.Count, MaxStack(info),
-            rec.Level, info?.MinLevel, info?.MaxLevel, info?.FixedLevel ?? false, rec.Durability?.Current, rec.Durability?.Max,
+            rec.Level, levels?.Min, levels?.Max, info?.FixedLevel ?? false, rec.Durability?.Current, rec.Durability?.Max,
             info is not null, icons.ItemIcon(rec.ItemId, info), rec.Rarity is not null);
     }
 }

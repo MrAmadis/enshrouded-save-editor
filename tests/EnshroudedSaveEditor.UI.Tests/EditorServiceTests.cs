@@ -419,6 +419,19 @@ public sealed class EditorServiceTests : IDisposable
         Assert.Equal(1, textures.Calls);
     }
 
+    // Leftover checks, 2026-10-26: no item goes past level 55, so a gem (1–105 in its data) is offered 1–55.
+    [Fact]
+    public void Views_offer_levels_up_to_55()
+    {
+        var e = Start();
+        var gem = ItemAt(e.Open(C(1)), Inv(7));                           // Gem of Storm's Eye, level 16
+        Assert.Equal((1, 55), (gem.MinLevel, gem.MaxLevel));
+        var listed = e.Catalog().Single(c => c.Id == gem.Id);
+        Assert.Equal((1, 55), (listed.MinLevel, listed.MaxLevel));
+        var bow = e.Catalog().Single(c => c.Id == WolfsSnarlLongbow);
+        Assert.Equal((1, 50), (bow.MinLevel, bow.MaxLevel));
+    }
+
     [Fact]
     public void AddItem_returns_ref_for_immediate_stack_edit()
     {

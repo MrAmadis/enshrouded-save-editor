@@ -94,7 +94,8 @@ public class InventoryLayoutTests
     [InlineData(0x26324e2cu, new[] { 4 })]          // … Boots
     [InlineData(0xe589d7a4u, new int[0])]           // Scorching Wand: weapons live in the action bar
     [InlineData(0x2b9d5b6fu, new int[0])]           // Copper Ore
-    [InlineData(0xb13154aeu, new int[0])]           // Riptide (Craft_Shield_…, no slot): not evidenced, so no position
+    [InlineData(0xb13154aeu, new[] { 12 })]         // Riptide (Craft_Shield_…, no slot in the reference data): the game
+    [InlineData(0xded1b712u, new[] { 12 })]         // kept Pikemead's Bulwark equipped there (leftover checks, 2026-10-26)
     public void Items_fit_only_their_positions(uint id, int[] positions)
     {
         var info = Item(id);

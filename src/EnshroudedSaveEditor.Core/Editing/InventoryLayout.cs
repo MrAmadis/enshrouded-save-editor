@@ -80,10 +80,22 @@ public static class InventoryLayout
     }
 
     /// <summary>
-    /// The highest level an edit may set on an item missing from the game data (the lowest is 1). A known item takes
-    /// levels within its own range, and a fixed-level one only its base level (session B).
+    /// No item goes past this level (1.0 patch notes: equipment max level 55). The game rewrote gems written at 80 and 105
+    /// to 55, though their data range is 1–105 (leftover checks, docs/research/in-game-findings.md).
     /// </summary>
-    public const int MaxItemLevel = 55;         // confirmed in-game: no — 1.0 patch notes: equipment max level 55
+    public const int MaxItemLevel = 55;         // confirmed in-game: yes (leftover checks, 2026-10-26)
+
+    /// <summary>
+    /// The levels an item may take: a fixed-level item only its base level (<see cref="ItemInfo.FixedLevel"/>, session B),
+    /// a ranged one its range up to <see cref="MaxItemLevel"/>, and one missing from the game data 1 to
+    /// <see cref="MaxItemLevel"/>.
+    /// </summary>
+    public static (int Min, int Max) LevelRange(ItemInfo? info) => info switch
+    {
+        null => (1, MaxItemLevel),
+        { FixedLevel: true } => (info.MinLevel, info.MinLevel),
+        _ => (Math.Min(info.MinLevel, MaxItemLevel), Math.Min(info.MaxLevel, MaxItemLevel)),
+    };
 
     /// <summary>
     /// The Equipped positions: bits 0–15 of the Equipped mask. A record sits at the position of its mask bit, and
@@ -134,12 +146,12 @@ public static class InventoryLayout
     /// backed by game-written saves (docs/research/player-character.md):
     /// <list type="bullet">
     /// <item>Equipment with an armour, ring or shield slot: that slot;</item>
-    /// <item>Equipment with no slot: a backpack (<see cref="BackpackRows"/>); a ward (<c>Ward_*</c>, at position 12
-    /// like a shield); an appearance piece (<c>Vanity_*_Helmet</c>, <c>_Chest</c>, <c>_Gloves</c>, <c>_Legs</c>,
-    /// <c>_Boots</c>);</item>
+    /// <item>Equipment with no slot: a backpack (<see cref="BackpackRows"/>); a ward (<c>Ward_*</c>) or a lore shield
+    /// (<c>Craft_Shield_*</c>, leftover checks), at position 12 like a shield (the install gives both the Shield slot); an
+    /// appearance piece (<c>Vanity_*_Helmet</c>, <c>_Chest</c>, <c>_Gloves</c>, <c>_Legs</c>, <c>_Boots</c>);</item>
     /// <item>Tools: a grappling hook (<c>Tool_Grappling_Hook*</c>) or a glider (<c>Tool_Glider_*</c>).</item>
     /// </list>
-    /// Anything else (weapons, other no-slot equipment such as <c>Craft_Shield_*</c>) has no Equipped position.
+    /// Anything else (weapons, other no-slot equipment) has no Equipped position.
     /// </summary>
     public static EquipKind? KindOf(ItemInfo info)
     {
@@ -151,7 +163,8 @@ public static class InventoryLayout
                 return gear;
             case ItemCategory.Equipment when info.Slot == EquipSlot.None:
                 if (BackpackRows.ContainsKey(name)) return EquipKind.Backpack;
-                if (name.StartsWith("Ward_", StringComparison.Ordinal)) return EquipKind.Shield;
+                if (name.StartsWith("Ward_", StringComparison.Ordinal) || name.StartsWith("Craft_Shield_", StringComparison.Ordinal))
+                    return EquipKind.Shield;
                 if (name.StartsWith("Vanity_", StringComparison.Ordinal))
                     foreach (var (suffix, kind) in AppearanceSuffixes)
                         if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) return kind;

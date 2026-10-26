@@ -85,14 +85,14 @@ public static class NewItemFields
     };
 
     /// <summary>
-    /// For a field set that has a level: the character's level clamped to the item's reference range. For a
-    /// fixed-level item that is its base level, which with no upgrades is the level the game gives it
-    /// (<see cref="ItemInfo.FixedLevel"/>); a same-id record's own level may include upgrades, so it isn't copied.
+    /// For a field set that has a level: the character's level clamped to the levels the item may take
+    /// (<see cref="InventoryLayout.LevelRange"/>). For a fixed-level item that is its base level, which with no upgrades is
+    /// the level the game gives it; a same-id record's own level may include upgrades, so it isn't copied.
     /// </summary>
     static byte DefaultLevel(ItemInfo info, uint characterLevel)
     {
-        var max = Math.Clamp(info.MaxLevel, 0, byte.MaxValue);
-        var min = Math.Clamp(info.MinLevel, 0, max);
-        return (byte)Math.Clamp(characterLevel, (uint)min, (uint)max);
+        var (min, max) = InventoryLayout.LevelRange(info);
+        max = Math.Clamp(max, 0, byte.MaxValue);
+        return (byte)Math.Clamp(characterLevel, (uint)Math.Clamp(min, 0, max), (uint)max);
     }
 }

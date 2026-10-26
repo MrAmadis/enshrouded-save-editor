@@ -317,10 +317,7 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
 
     static int MaxStack(ItemInfo info) => Math.Clamp(info.MaxStack, 1, ushort.MaxValue);
 
-    /// <summary>
-    /// Session B (docs/research/in-game-findings.md): a fixed-level item takes only its base level, a ranged one its
-    /// reference range, and an item missing from the game data 1 to <see cref="InventoryLayout.MaxItemLevel"/>.
-    /// </summary>
+    /// <summary>The levels <see cref="InventoryLayout.LevelRange"/> allows; a fixed-level item's message says why.</summary>
     static void EnsureLevelAllowed(ItemInfo? info, int level)
     {
         if (info is { FixedLevel: true })
@@ -328,7 +325,7 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
             if (level != info.MinLevel) throw LevelSetByGame(info);
             return;
         }
-        var (min, max) = info is null ? (1, InventoryLayout.MaxItemLevel) : (info.MinLevel, Math.Min(info.MaxLevel, byte.MaxValue));
+        var (min, max) = InventoryLayout.LevelRange(info);
         if (level < min || level > max) throw new EditRejectedException($"The level must be between {min} and {max}.");
     }
 

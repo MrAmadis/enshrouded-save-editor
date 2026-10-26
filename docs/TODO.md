@@ -2,7 +2,7 @@
 
 ## 1. Remaining plan work
 
-- **In-game checks left over from the final walkthrough** (the install's data changed them): see "Left over from the final walkthrough (Task 21)" in `docs/research/in-game-findings.md`.
+- **In-game checks still left over from the final walkthrough** (icons after a game patch, the first launch after a reboot, a Steam update while the editor is open): see "Left over from the final walkthrough (Task 21)" in `docs/research/in-game-findings.md`.
 - **Session B in-game checks** (see `docs/research/in-game-findings.md`, "For session B"):
   - how the game sets equipped header byte 2;
   - then enabling equip into an empty slot, and unequip.
@@ -11,6 +11,5 @@
 
 ## 2. Cleanup
 
-- **Six unused Lab copies in the Steam folder** (`remote\character3–8.ksd`, invisible to the game): delete them with the owner's OK.
-- **Local test characters** (`keen games\Enshrouded\default\character1–8.ksd`: "Test …", "Try Me" and "Final Check"): delete them in-game when done.
-- **In-game checks:** always use a new throwaway world. Session A's test characters were played in `world0`, and the game saved that world.
+- **The test character "Leftover Checks"** (`keen games\Enshrouded\default\character1.ksd`): delete it in-game when testing is done. Every earlier test character, and the six unused copies in the Steam folder, were removed on 2026-10-26 (to the Recycle Bin).
+- **In-game checks:** always use a new throwaway world. Test characters were played in Steam `world0` (session A, and "Final Check"), and the game saved that world.
