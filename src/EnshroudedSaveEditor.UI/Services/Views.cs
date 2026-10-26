@@ -77,7 +77,12 @@ public sealed record SessionView(
 /// <param name="MaxStack">1 to 65535, as AddItem allows.</param>
 /// <param name="FixedLevel">The game sets the level (<see cref="ItemInfo.FixedLevel"/>), so a new one is added at
 /// <paramref name="MinLevel"/>; otherwise AddItem takes a level from <paramref name="MinLevel"/> to <paramref name="MaxLevel"/>.</param>
+/// <param name="Icon">Gives the icon's URL; asked only when the item is shown, because the first ask may extract the
+/// install's icon (the catalog holds every item).</param>
 /// <param name="InternalName">The game's own name ("Weapon_T1_2H_BowEpic_02"), which the browser's search also covers.</param>
 public sealed record CatalogEntryView(
     uint Id, string Name, ItemCategory Category, string SubCategory, Rarity BaseRarity, int MaxStack, int MinLevel, int MaxLevel,
-    bool FixedLevel, string IconUrl, string InternalName);
+    bool FixedLevel, Func<string> Icon, string InternalName)
+{
+    public string IconUrl => Icon();
+}

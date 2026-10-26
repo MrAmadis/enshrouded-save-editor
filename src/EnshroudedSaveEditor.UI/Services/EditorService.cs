@@ -322,14 +322,17 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         return (view, added);
     }
 
-    /// <summary>Every item the Add item browser offers, by name: all but Customization. Built once.</summary>
+    /// <summary>
+    /// Every item the Add item browser offers, by name: all but Customization. Built once; an entry's icon is resolved when
+    /// it is shown.
+    /// </summary>
     public IReadOnlyList<CatalogEntryView> Catalog()
     {
         lock (_lock)
             return _catalog ??= Data.Items.All
                 .Where(i => i.Category != ItemCategory.Customization)
                 .Select(i => new CatalogEntryView(i.Id, i.Name, i.Category, SubCategory(i), i.BaseRarity, MaxStack(i), i.MinLevel,
-                    i.MaxLevel, i.FixedLevel, icons.ItemIcon(i.Id, i), i.InternalName))
+                    i.MaxLevel, i.FixedLevel, () => icons.ItemIcon(i.Id, i), i.InternalName))
                 .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(c => c.Id)
                 .ToList()

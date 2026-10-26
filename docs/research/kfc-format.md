@@ -5,9 +5,11 @@ The editor reads its items, skill tree, skill-point rewards and level cap from t
 editor's model, and how the result compares with the embedded reference data.
 
 **Credit.** The format was learned by studying [Brabb3l/kfc-parser](https://github.com/Brabb3l/kfc-parser) (GPL-3.0,
-commit `16708594`, 2026-10-17): its container and reflection readers and its format notes. No code was copied; the C#
-reader was written from the description below, and checked against the files of this machine's install. Everything is
-read-only: files are opened with `FileAccess.Read, FileShare.ReadWrite`, and nothing is written under the install.
+commit `16708594`, 2026-10-17): its container and reflection readers and its format notes (for icons: its notes that UI
+textures are `keen::UiTextureResource`s whose formats follow Vulkan's names). No code was copied; the C# reader was
+written from the description below, and checked against the files of this machine's install. The BC7 decoder was written
+from the BC7 specification. Everything is read-only: files are opened with `FileAccess.Read, FileShare.ReadWrite`, and
+nothing is written under the install.
 
 Install used: game build `1273043|^/game38/branches/release_1.0|2026-10-20T14:55:29Z` (the version string in
 `enshrouded.kfc`; file times 2026-10-21).
@@ -152,6 +154,55 @@ Every `keen::ItemInfo` resource (4,262, unique ids) becomes an `ItemInfo`, fille
   `skillPointsPerLevel` 2).
 - **XP per level: not in the install.** `BalancingTable.experienceNeedPerLevel` has only five values (1000, 2023, 3046,
   4069, 5092); the table for 49 levels isn't stored, so `XpPerLevel` stays unknown (from the reference: null).
+
+## Icons
+
+The game ships its item icons pre-rendered: the editor reads them, and the ability icons, from the install
+(`KfcIconTextures`, `KfcTexture`, `Bc7`).
+
+- **Items:** every `keen::ItemInfo` (4,262) has a `keen::UiTextureResource` with the item's own GUID (its `objectId`),
+  named `<debugName>_icon`: the icon the game's tools rendered from `iconModel` and `iconScene`. (`iconImage`, set on 273
+  items, names a `keen::UiImage`, the import settings of a hand-made picture; its GUID is also a `UiTextureResource`. The
+  editor doesn't need it: the item's own GUID always has one.)
+- **Skills:** a `keen::SkillTreeNode` has `iconActive` and `iconInactive` (`keen::UiTexture`: `image`, a reference to a
+  `keen::UiImage`); the `UiTextureResource` with that GUID is the picture. Only the 43 ability nodes (`ActiveSkill`) have
+  them, about 100 px, unlocked in colour and out of reach in grey; the editor uses `iconActive`. Attributes, passives and
+  Sparks have none (the game draws generic node art, the `skillnode_*` textures).
+- **`keen::UiTextureResource`** (56 bytes): `data` (`keen::ResourceContentReference`: the content hash at offset 0),
+  `debugName`, `size` (`x`, `y`), `type` (`Texture2D` for icons), `format` (`keen::PixelFormat`, Vulkan's names),
+  `levelCount`, `isTiled` (0 for every icon). Icon textures are part 0; textures with more parts exist (the map's shader
+  parameters) but no icon is one.
+- **Content:** the mip levels one after the other, largest first, each half the one before (rounded down, at least 1),
+  stored raw: a 256×256 BC7 icon with 9 levels is 87,408 bytes; a 1299×1314 one with 11 levels 2,283,744. BC7 blocks
+  (16 bytes for 4×4 texels) are stored row by row; a level whose size isn't a multiple of 4 has partial blocks at its
+  right and bottom edges.
+- **Formats met:** item icons are all `BC7_unorm_block` (4,011 at 256×256, 242 at 512×512, a few odd sizes such as
+  1299×1314, 374×388 or 200×200); ability icons are `R8G8B8A8_unorm`, one level, 75–117 px and not square. The 5,699
+  UI textures use only these two formats and BC4, BC5 (100 each) and R16 (one); the editor reads the two icon formats.
+- **Colour:** the texels are used as stored (the PNG carries no colour profile), which looks like the game.
+- **Blank icons:** 104 item icons are fully transparent: those of the 103 Customization items (which the editor hides)
+  and Bare Fists. They count as no icon.
+- **BC7:** decoded in C# from the specification (Khronos Data Format Specification, "BC7"): eight modes, the 64 two-
+  and three-subset partitions with their anchor texels, P-bits, rotation and the second index of modes 4 and 5. Checked
+  bit for bit against Pillow 13's decoder on 8,192 random blocks (1,024 per mode, every partition). A block without a mode
+  bit (a reserved mode) decodes to all zeroes, transparent black, as Direct3D's BC7 documentation says (Pillow gives
+  opaque black).
+
+**In the editor.** An icon is extracted on its first request as a PNG of the first mip level no larger than 128 px
+(`<AppDataRoot>\cache\icons\item\<id:x8>.png`, `…\skill\<id:x8>.png`); the editor draws icons at 22–36 px. A
+`textures.version` file in the icon cache folder holds the extraction format and the size and timestamp of
+`enshrouded.kfc` and `enshrouded.exe`; when it differs, the cached PNGs are deleted and extracted again. Measured on this
+machine (Release build, warm file cache):
+
+| | |
+| --- | --- |
+| Install items with an icon | 4,158 of 4,262 (the others are the 104 blank ones: glyphs) |
+| Reference items with an icon | 3,384 of the 3,414 that aren't Customization (the other 30: Bare Fists, and 29 no longer in the game) |
+| Skill nodes with an icon | 43 of 243: every ability |
+| First icon of a session | about 0.18 s: opens the archive and the type metadata, and lists every item's and node's texture |
+| An icon's first request | about 1 ms: 0.25 ms to decode, 0.3 ms to encode the PNG, the rest writing the file; 120 new Add item tiles about 0.13 s |
+| A cached icon | about 0.04 ms (the file's existence is checked once per session) |
+| Cache size | about 17 KB per item icon, 69 MB if every item's were extracted |
 
 ## Match with the reference
 

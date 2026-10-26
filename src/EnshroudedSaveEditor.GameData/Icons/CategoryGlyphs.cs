@@ -5,10 +5,10 @@ using EnshroudedSaveEditor.Core.Model;
 namespace EnshroudedSaveEditor.GameData;
 
 /// <summary>
-/// Line icons used until the install's own icons can be read (Task 20): one per item category, armour slot, Equipped
-/// position kind and skill node type, in the style of the approved mockup
-/// (<c>docs/superpowers/specs/mockups/inventory-and-picker.html</c>): a 24×24 view, no fill, 1.6 round strokes. The
-/// stroke is the mockup's slot colour, because an SVG shown as an image can't inherit the page's colour.
+/// Line icons for what has no icon of the game's own (no install, an unknown item, a skill node other than an ability, an
+/// empty Equipped position): one per item category, armour slot, Equipped position kind and skill node type, in the style
+/// of the approved mockup (<c>docs/superpowers/specs/mockups/inventory-and-picker.html</c>): a 24×24 view, no fill, 1.6
+/// round strokes. The stroke is the mockup's slot colour, because an SVG shown as an image can't inherit the page's colour.
 /// </summary>
 public static class CategoryGlyphs
 {

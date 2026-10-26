@@ -45,9 +45,22 @@ internal sealed class KfcResources : IDisposable
         return new KfcValue(Types, type, _archive.ReadResource(id)!);
     }
 
+    /// <summary>
+    /// The resource of the type called <paramref name="typeName"/> with <paramref name="guid"/> (its first part, the only
+    /// one icon textures have), or null when there is none.
+    /// </summary>
+    public KfcValue? Find(Guid guid, string typeName)
+    {
+        var type = Types[typeName];
+        return _archive.ReadResource(new ResourceId(guid, type.Hash, 0)) is { } data ? new KfcValue(Types, type, data) : null;
+    }
+
     /// <summary>The content blob a content hash (16 bytes) names, read as the type called <paramref name="typeName"/>.</summary>
     public KfcValue? Content(KfcValue hash, string typeName) =>
         _archive.ReadContent(hash.Bytes16) is { } data ? new KfcValue(Types, Types[typeName], data) : null;
+
+    /// <summary>The bytes of the content blob a content hash (16 bytes) names; null when it isn't in the archive.</summary>
+    public byte[]? ContentData(KfcValue hash) => _archive.ReadContent(hash.Bytes16);
 
     public void Dispose() => _archive.Dispose();
 }

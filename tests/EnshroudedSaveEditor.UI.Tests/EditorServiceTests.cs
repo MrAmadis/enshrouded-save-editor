@@ -347,6 +347,36 @@ public sealed class EditorServiceTests : IDisposable
         Assert.Equal(catalog.OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase).ThenBy(c => c.Id).Select(c => c.Id), catalog.Select(c => c.Id));
     }
 
+    /// <summary>Hands out a 1×1 icon for every id and counts how often it is asked.</summary>
+    sealed class CountingTextures : IIconTextureSource
+    {
+        public int Calls;
+        public string Version => "test";
+        public IconTexture? ItemTexture(uint id) => Count();
+        public IconTexture? SkillTexture(uint nodeId) => Count();
+
+        IconTexture Count()
+        {
+            Interlocked.Increment(ref Calls);
+            return new IconTexture(1, 1, [1, 2, 3, 255]);
+        }
+    }
+
+    [Fact]
+    public void Catalog_extracts_an_item_icon_only_when_it_is_shown()
+    {
+        var options = new EditorOptions([_root], _appData, _probe, null);
+        var textures = new CountingTextures();
+        var e = new EditorService(options, new GameDataProvider(ReferenceGameData.Load), new IconService(options.IconCacheRoot, textures));
+
+        var catalog = e.Catalog();
+        Assert.Equal(0, textures.Calls);
+
+        Assert.Equal($"https://icons.ese/item/{catalog[0].Id:x8}.png", catalog[0].IconUrl);
+        Assert.Equal(catalog[0].IconUrl, catalog[0].IconUrl);
+        Assert.Equal(1, textures.Calls);
+    }
+
     [Fact]
     public void AddItem_returns_ref_for_immediate_stack_edit()
     {
