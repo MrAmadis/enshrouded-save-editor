@@ -1,7 +1,7 @@
 # Enshrouded Save Editor — Design
 
 Date: 2026-10-25
-Status: draft for review
+Status: built; final walkthrough passed 2026-10-26 (what is still open is marked in §10)
 
 ## 1. Intent
 
@@ -339,25 +339,28 @@ Every item below is verified **in the real game**: edit the save, load it in Ens
    - Does the game ever fall back to its own `remote\backup\` copies?
    - The editor never edits `remotecache.vdf` or the game's `remote\backup\` files. *(my call)*
    - If Steam must be closed while saving, the editor checks for `steam.exe` and says so before writing.
+   - **Still open:** every in-game check so far ran on local characters, which Steam Cloud never sees. Testing an edited Steam character needs the owner's own Save on one, or a game-made Steam throwaway (owner to decide).
    - **If edits are still lost with Steam closed,** the owner turns Steam Cloud off for Enshrouded (owner). The game then keeps saves in `%USERPROFILE%\Saved Games\Enshrouded\`, which the editor already supports (§5). Check that the game moves or copies the characters there, and that the editor finds them.
 3. **Inventory map:** the equipped slot numbers (is 0–4 appearance and 5–9 worn armour?), the hotbar's location, how the backpack size follows the equipped backpack, and the Inventory and Extra slots containers. **Settled:** the slot map in §6.4, and the backpack size in §7. **Still open (session B):** when the game sets or clears the Equipped header's byte 2 (mask bits 16–18) as gear goes on and off. Until then the editor only swaps equipped items, and doesn't equip into empty slots or unequip.
 4. **New items:**
    - Which optional fields does the game need on a fresh weapon or armour piece (level, durability, rarity, bits 2 and 3)? Compare with items the game itself created. **Settled:** the game kept the editor's field sets for a bow, an armour piece and a ring.
    - Does a stack above its max get clamped? The UI caps it anyway. **Settled:** yes, the game clamped Fireball I 600 to 500.
-   - Does gear added straight to an equipped slot apply its stats? (The editor adds new items to the backpack only; they are equipped by a swap.)
+   - Does gear added straight to an equipped slot apply its stats? (The editor adds new items to the backpack only; they are equipped by a swap.) **Not applicable:** the editor never adds into Equipped.
+   - **Item levels, settled (session B):** the game sets the level of fixed-level gear (min level = max level) to its base plus upgrades and rewrites any other value; ranged items keep the written level. The editor follows this (§8.4), and the final walkthrough's Bow Of The Serpent, added at its base level, was kept.
 5. **Skills:**
    - What do rank-0 entries mean? **Settled:** not learned, and not connected in the tree.
    - Does the game check paths or points on load? **Points, settled:** it resets an overspent tree (below). Paths weren't tested apart.
    - What happens when more points are spent than earned (Unlimited mode)? If the game resets, clamps or rejects such a tree, **drop Unlimited** and keep Game rules only (owner). Don't add points by writing reward ids into `player_knowledge`; the owner declined that. **Settled:** on load the game reset the whole tree, so **Unlimited is dropped**.
    - Does a learned passive's bonus apply, or does the game need extra state? **Settled:** passives learned by the editor show on the stats, and the points left match (69 − 13 = 56). A node the owner learned in-game was appended at rank 1, exactly as the editor does it.
-   - Do Refund all and a rebuild hold after a reload?
+   - Do Refund all and a rebuild hold after a reload? **Settled (final walkthrough):** yes, the rebuilt tree loaded and was kept.
 6. **Level and XP:**
    - What does the XP value mean, what is the level cap, and where is the XP table in game data?
    - Does the game recompute level from XP?
    - Does a level change keep the points maths in §6.6? **Settled:** "Test Repack" at level 9 showed 4 points available, as §6.6 gives. XP 0 shows an empty bar, which fits XP counting into the current level (still to confirm with a non-zero value).
+   - **Still open:** the install reader confirms the level cap of 50, but the install holds no XP-per-level table, so XP stays a raw number without a progress bar.
 7. **Name:** is any length accepted, and what is the creator's limit? (Storage elsewhere is ruled out, §6.3.) **Settled:** the game displays a 40-character name, and the creator accepts 15. The editor caps names at 15 (§8.3).
-8. **Game updates:** if `SV2C` isn't version 2, or a section's data version differs from those in §6.2, or a checksum fails, or a record layout isn't recognised, open read-only with a clear message. Never write in that state.
-9. **Icons:** find and decode item and skill icon textures (§7).
+8. **Game updates:** if `SV2C` isn't version 2, or a section's data version differs from those in §6.2, or a checksum fails, or a record layout isn't recognised, open read-only with a clear message. Never write in that state. **Built and tested.** Game data that can't be read from a patched install falls back to the reference data, and the character list says which source is in use.
+9. **Icons:** find and decode item and skill icon textures (§7). **Settled (Task 20):** item icons are BC7 textures under each item's GUID (4,158 of 4,262 items); the 43 ability nodes have icons; everything else keeps its category glyph.
 
 ## 11. Success looks like
 

@@ -97,6 +97,23 @@ What this settles:
 - **Upgrades** (the rarity field's second byte) aren't editable; a new item gets 0.
 - **Durability:** the game recomputes it, so the copied value is fine.
 
+## Final walkthrough (Task 21) — 2026-10-26
+
+On "Final Check" (local `character8.ksd`, a copy of Steam character1), with the published build reading game data and icons
+from the install. **Owner: "All good."** `watch` captures in `local-c/character8/`:
+
+| Capture | Written by | What changed |
+|---|---|---|
+| 11:39:35 | the editor | Level 18 → 19. 7 skills learned (Refund all and a rebuild before the save). Copper Arrow ×88 → ×500. Materials ×50 added. Bow Of The Serpent `a7b1345e` (fixed level 26) added at 26. A ring swapped into the second ring position, the old one into the extension. |
+| 11:39:47 | the editor | Name → "Final Check 123" (`character_data` only). |
+| 11:41:39 | the game | Everything kept: name, level 19, XP, all 7 skills and every record. Only the new bow's durability was recomputed (381 → 358), as for every added weapon. |
+
+What this settles:
+- The full §11 walkthrough on install data: every edit loads and is kept, and a skill rebuild after Refund all holds.
+- **Fixed-level gear added at its base level is kept** (the bow stayed at 26).
+
+Not exercised in the captures (no shield, ward, gem or changed-level item was edited), so the walkthrough checks below stay open.
+
 ## Still open
 
 - ~~The in-game name box limit~~: 15 characters (owner, above).
@@ -108,7 +125,7 @@ What this settles:
   3. Take off **only the backpack** (or another non-shield piece). Does byte 2 stay as it is?
   4. If 1–3 show byte 2 is independent of the gear positions: a Lab copy with one armour position emptied by the editor (record removed, mask bit cleared, byte 2 untouched). Does the game load it, show the slot empty, and keep the item in the backpack?
 - The meaning of the Equipped u16 values, the inventory header byte x (`01`/`02`), and the 22-byte tail.
-- **For the final walkthrough (Task 21).** What the install's data (Tasks 19–20) changed, and what couldn't be tested here. Game checks go on a local copy.
+- **Left over from the final walkthrough (Task 21).** What the install's data (Tasks 19–20) changed, and what couldn't be tested here. Game checks go on a local copy.
   - **Lore shields and wards:** the 11 `Craft_Shield_*` lore shields and the 12 `Ward_*` wards can now be swapped into the Shield position (12). Does the game keep the swap?
   - **New wards** get level, durability and rarity (flags `0x13`, chosen by the install's Shield slot). Does the game load an added ward like one of its own?
   - **Five items changed their fixed level:** the Enhanced Spiked, Mace-like and Iron Claw clubs (now 1–50) and the Gem of Skulls (now 1–105) can be levelled; the Shroud Meteor Scroll is now fixed at 20. Does the game keep these levels?
