@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EnshroudedSaveEditor.GameData;
+using EnshroudedSaveEditor.GameData.Install;
 using EnshroudedSaveEditor.UI.Services;
 
 namespace EnshroudedSaveEditor.Tests;
@@ -56,7 +57,34 @@ public sealed class ServiceSupportTests : IDisposable
         var o = new EditorOptions([], @"C:\AppData\Ese", new EditorServiceTests.FakeProbe(), null);
         Assert.Equal(@"C:\AppData\Ese\backups", o.BackupRoot);
         Assert.Equal(@"C:\AppData\Ese\cache\icons", o.IconCacheRoot);
+        Assert.Equal(@"C:\AppData\Ese\cache\gamedata", o.GameDataCacheRoot);
         Assert.Equal(@"C:\AppData\Ese\settings.json", o.SettingsPath);
         Assert.EndsWith(@"\EnshroudedSaveEditor", EditorOptions.DefaultAppDataRoot);
+    }
+
+    [Fact]
+    public void Without_an_install_the_reference_data_is_used()
+    {
+        Assert.Same(ReferenceGameData.Load(), GameDataProvider.Load(null, Path.Combine(_dir, "cache")));
+    }
+
+    [Fact]
+    public void An_install_that_cannot_be_read_falls_back_to_the_reference_data()
+    {
+        var game = Path.Combine(_dir, "game");
+        Directory.CreateDirectory(game);
+        foreach (var f in new[] { "enshrouded.exe", "enshrouded.kfc", "enshrouded.kfc_resources" })
+            File.WriteAllText(Path.Combine(game, f), "not game data");
+        Assert.Same(ReferenceGameData.Load(), GameDataProvider.Load(GameInstall.Find(game), Path.Combine(_dir, "cache")));
+    }
+
+    [Fact]
+    public void A_found_install_is_preferred_with_the_reference_data_as_fallback()
+    {
+        var install = GameInstall.Find(null);
+        Assert.SkipWhen(install is null, "Enshrouded is not installed");
+        var data = GameDataProvider.Load(install, Path.Combine(_dir, "cache"));
+        Assert.IsType<CompositeGameData>(data);
+        Assert.StartsWith("Your Enshrouded install", data.Source);
     }
 }

@@ -10,6 +10,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EnshroudedSaveEditor.GameData.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Reference\*.json" LogicalName="Reference.%(Filename)%(Extension)" />
   </ItemGroup>
 

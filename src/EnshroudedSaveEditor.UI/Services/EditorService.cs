@@ -8,7 +8,7 @@ using EnshroudedSaveEditor.GameData;
 namespace EnshroudedSaveEditor.UI.Services;
 
 /// <param name="SaveRoots">The folders searched for <c>characterN.ksd</c> (<see cref="SaveLocator.DefaultRoots"/> in the app).</param>
-/// <param name="AppDataRoot">Holds <c>backups\</c>, <c>cache\icons\</c> and <c>settings.json</c>.</param>
+/// <param name="AppDataRoot">Holds <c>backups\</c>, <c>cache\icons\</c>, <c>cache\gamedata\</c> and <c>settings.json</c>.</param>
 /// <param name="PickFolder">Shows a native folder dialog; supplied by the desktop window.</param>
 public sealed record EditorOptions(IReadOnlyList<string> SaveRoots, string AppDataRoot, IProcessProbe Probe, Func<string?>? PickFolder)
 {
@@ -20,6 +20,9 @@ public sealed record EditorOptions(IReadOnlyList<string> SaveRoots, string AppDa
 
     /// <summary>The folder the window maps to <c>https://icons.ese/</c>.</summary>
     public string IconCacheRoot => Path.Combine(AppDataRoot, "cache", "icons");
+
+    /// <summary>Where the game data read from the install is cached.</summary>
+    public string GameDataCacheRoot => Path.Combine(AppDataRoot, "cache", "gamedata");
 
     public string SettingsPath => Path.Combine(AppDataRoot, "settings.json");
 }

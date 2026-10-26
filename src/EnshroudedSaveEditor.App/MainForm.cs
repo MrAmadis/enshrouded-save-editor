@@ -1,5 +1,6 @@
 using EnshroudedSaveEditor.Core.Files;
 using EnshroudedSaveEditor.GameData;
+using EnshroudedSaveEditor.GameData.Install;
 using EnshroudedSaveEditor.UI.Services;
 using Microsoft.AspNetCore.Components.WebView.WindowsForms;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,7 +21,8 @@ internal sealed class MainForm : Form
 
         var options = new EditorOptions(SaveLocator.DefaultRoots(), EditorOptions.DefaultAppDataRoot, new ProcessProbe(), PickFolder);
         var icons = new IconService(options.IconCacheRoot);
-        var game = new GameDataProvider(ReferenceGameData.Load);
+        var game = new GameDataProvider(() => GameDataProvider.Load(
+            GameInstall.Find(Settings.Load(options.SettingsPath).GameDir), options.GameDataCacheRoot));
 
         var services = new ServiceCollection();
         services.AddWindowsFormsBlazorWebView();
