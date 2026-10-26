@@ -214,7 +214,8 @@ The reference data (Kimikozi's `itemdb2.json`, `progress.json`) is labelled "bui
 | Items present | 3,497 of the 3,526 reference ids (99.2 %). The 29 missing ones (e.g. Sharpshooter and Marksman armour, a `DEPRICATED` ring) are nowhere in the archive: a scan of every resource for three of their ids found nothing. The install has 765 items the reference lacks (e.g. T7 potions and materials). |
 | Name, MaxStack, Category, MinLevel, MaxLevel all equal | 3,349 of the 3,497 present (95.8 %); 94.98 % of all 3,526 reference ids. Name 3,392, Category 3,496, MaxStack 3,497, MinLevel 3,441, MaxLevel 3,442. |
 | Slot, WeaponType, BaseRarity | 3,413 of 3,497 (97.6 %); InternalName 3,283 (93.9 %). |
-| Editing rules (`InventoryLayout.KindOf`, `FixedLevel`, `ExtraCapacity`, MaxStack, Category) | 3,480 of 3,497 (99.5 %). `KindOf` differs only for the 11 `Craft_Shield_*` lore shields: the install gives them the Shield slot, the reference none. `ExtraCapacity` agrees for every item. |
+| Editing rules (`InventoryLayout.KindOf`, `FixedLevel`, `ExtraCapacity`, MaxStack, Category) | 3,480 of 3,497 (99.5 %). `KindOf` differs only for the 11 `Craft_Shield_*` lore shields: the install gives them the Shield slot, the reference none. `FixedLevel` differs for 5 items (the Enhanced Spiked, Mace-like and Iron Claw clubs and the Gem of Skulls are ranged in the install, the Shroud Meteor Scroll is fixed at 20), and Category for Butter (Materials → Consumables). `ExtraCapacity` agrees for every item. |
+| Slots | 26 items differ. 23 get the Shield slot in the install and none in the reference: the 11 `Craft_Shield_*` lore shields and the 12 `Ward_*` wards (`KindOf` already put the wards in the shield position, by name; their new records now get the Shield field set, flags 0x13). The 2 `Philipp_*` debug items get Weapon instead of none, and the water hose (`Tool_T3_Channelled_Water_Hose_Tool`, Portable Water Pump) none instead of Weapon. |
 | Tree | 243 of 243 node ids, costs, max ranks, types, classes and positions (identical after rounding to 0.1, as the reference is); 312 of 312 links; names 240; descriptions 228 equal, every placeholder filled; 12 of 12 label names and classes (positions 50–400 units apart: the reference puts every label at about the same radius). |
 | Rewards | 78 of 78 ids with equal points. |
 | Saves | Every item and skill id in the three fixture characters is known (the reference misses six appearance items). |
@@ -228,6 +229,7 @@ internal name that now have names (T7 materials), and items removed from the gam
 
 The extracted pieces are cached as JSON in `<AppDataRoot>\cache\gamedata\install.json` (1.6 MB), keyed to the size and
 last-write time of `enshrouded.kfc` and `enshrouded.exe` and to a format number in the code. A missing, stale or
-malformed cache is rebuilt. A piece that can't be read is cached as missing, so the next start doesn't retry it until
-the game (or the cache format) changes. On this machine (warm file cache) a cold load takes about 0.4 s and a cached
-load about 0.09 s.
+malformed cache is rebuilt. The cache is written only when every piece was read: a piece that failed may have failed
+only that once (a `.dat` file Steam is writing on a patch day), so the next start reads the install again. A cache with a
+missing piece is not used either. On this machine (warm file cache) a cold load takes about 0.4 s and a cached load about
+0.09 s.

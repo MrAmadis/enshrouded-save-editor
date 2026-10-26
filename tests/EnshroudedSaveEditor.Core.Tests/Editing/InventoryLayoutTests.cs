@@ -73,14 +73,6 @@ public class InventoryLayoutTests
         Assert.All(p.Skip(5), x => Assert.False(x.IsAppearance));
         Assert.Equal(["Helmet appearance", "Helmet", "Ring", "Ring", "Shield", "Grappling hook", "Glider", "Backpack"],
             new[] { 0, 5, 10, 11, 12, 13, 14, 15 }.Select(i => p[i].Label));
-        Assert.Equal([5], InventoryLayout.EquippedSlotsFor[EquipSlot.Helmet]);
-        Assert.Equal([6], InventoryLayout.EquippedSlotsFor[EquipSlot.Chest]);
-        Assert.Equal([7], InventoryLayout.EquippedSlotsFor[EquipSlot.Arms]);
-        Assert.Equal([8], InventoryLayout.EquippedSlotsFor[EquipSlot.Legs]);
-        Assert.Equal([9], InventoryLayout.EquippedSlotsFor[EquipSlot.Boots]);
-        Assert.Equal([10, 11], InventoryLayout.EquippedSlotsFor[EquipSlot.Ring]);
-        Assert.Equal([12], InventoryLayout.EquippedSlotsFor[EquipSlot.Shield]);
-        Assert.False(InventoryLayout.EquippedSlotsFor.ContainsKey(EquipSlot.Weapon));
     }
 
     [Theory]

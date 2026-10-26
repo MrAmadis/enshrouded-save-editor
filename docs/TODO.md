@@ -2,10 +2,7 @@
 
 ## 1. Remaining plan work
 
-- **Task 19:** read items, the tree and rewards from the install (`enshrouded.kfc`).
-- **Task 20:** icons from the install.
-- **Task 21:** final acceptance with the owner.
-- **Final whole-branch review** (subagent-driven).
+- **Task 21:** final acceptance with the owner (check list: "For the final walkthrough (Task 21)" in `docs/research/in-game-findings.md`).
 - **Session B in-game checks** (see `docs/research/in-game-findings.md`, "For session B"):
   - how the game sets equipped header byte 2;
   - then enabling equip into an empty slot, and unequip.

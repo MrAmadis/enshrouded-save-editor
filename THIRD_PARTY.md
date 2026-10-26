@@ -37,3 +37,63 @@ SOFTWARE.
 - **Cinzel:** copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel). License text: `src/EnshroudedSaveEditor.UI/wwwroot/fonts/OFL-Cinzel.txt`.
 - **Source Sans 3:** copyright 2010-2020 Adobe, with Reserved Font Name "Source". License text: `src/EnshroudedSaveEditor.UI/wwwroot/fonts/OFL-SourceSans3.txt`.
 - **What we use:** the latin-subset variable woff2 files as served by Google Fonts (`Cinzel.woff2`, `SourceSans3.woff2`), unmodified, bundled with the app so it needs no network. They are used for headings and body text.
+
+## ZstdSharp.Port (MIT)
+
+- **Source:** https://github.com/oleg-st/ZstdSharp, NuGet package `ZstdSharp.Port` 0.8.6, unmodified and bundled with the app. It is a C# port of the Zstandard (zstd) library.
+- **What we use:** zstd compression and decompression of the save file's sections (`src/EnshroudedSaveEditor.Core/Container/KsdSection.cs`), and decompression of the game's resource chunks when the install's data is read (`src/EnshroudedSaveEditor.GameData/Kfc/KfcArchive.cs`).
+
+```
+MIT License
+
+Copyright (c) 2021 Oleg Stepanischev
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## System.IO.Hashing (MIT)
+
+- **Source:** Microsoft's .NET (https://github.com/dotnet/runtime), NuGet package `System.IO.Hashing` 10.0.0, unmodified and bundled with the app.
+- **What we use:** XxHash3 for the save file's section checksums (`src/EnshroudedSaveEditor.Core/Container/KsdChecksum.cs`), and CRC-32 for the icon PNG files (`src/EnshroudedSaveEditor.GameData/Icons/Png.cs`).
+
+```
+The MIT License (MIT)
+
+Copyright (c) .NET Foundation and Contributors
+
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```

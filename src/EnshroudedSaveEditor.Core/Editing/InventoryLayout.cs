@@ -80,9 +80,8 @@ public static class InventoryLayout
     }
 
     /// <summary>
-    /// The highest item level an edit may set (the lowest is 1), for any record with a level field. The reference
-    /// level ranges don't bound real records (e.g. Alchemist Apprentice pieces at level 10 against 5–5), so they
-    /// only give the default level of an added item.
+    /// The highest level an edit may set on an item missing from the game data (the lowest is 1). A known item takes
+    /// levels within its own range, and a fixed-level one only its base level (session B).
     /// </summary>
     public const int MaxItemLevel = 55;         // confirmed in-game: no — 1.0 patch notes: equipment max level 55
 
@@ -116,14 +115,6 @@ public static class InventoryLayout
     /// they change the mask, and when the game changes header byte 2 isn't known.
     /// </summary>
     public const bool EquipMapKnown = true;     // confirmed in-game: yes (session A)
-
-    /// <summary>The Equipped positions each armour slot may go in.</summary>
-    public static IReadOnlyDictionary<EquipSlot, byte[]> EquippedSlotsFor { get; } =   // confirmed in-game: yes (session A)
-        new ReadOnlyDictionary<EquipSlot, byte[]>(new Dictionary<EquipSlot, byte[]>
-        {
-            [EquipSlot.Helmet] = [5], [EquipSlot.Chest] = [6], [EquipSlot.Arms] = [7], [EquipSlot.Legs] = [8],
-            [EquipSlot.Boots] = [9], [EquipSlot.Ring] = [10, 11], [EquipSlot.Shield] = [12],
-        });
 
     static readonly Dictionary<EquipSlot, EquipKind> GearBySlot = new()
     {

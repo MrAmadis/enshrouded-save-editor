@@ -108,3 +108,12 @@ What this settles:
   3. Take off **only the backpack** (or another non-shield piece). Does byte 2 stay as it is?
   4. If 1–3 show byte 2 is independent of the gear positions: a Lab copy with one armour position emptied by the editor (record removed, mask bit cleared, byte 2 untouched). Does the game load it, show the slot empty, and keep the item in the backpack?
 - The meaning of the Equipped u16 values, the inventory header byte x (`01`/`02`), and the 22-byte tail.
+- **For the final walkthrough (Task 21).** What the install's data (Tasks 19–20) changed, and what couldn't be tested here. Game checks go on a local copy.
+  - **Lore shields and wards:** the 11 `Craft_Shield_*` lore shields and the 12 `Ward_*` wards can now be swapped into the Shield position (12). Does the game keep the swap?
+  - **New wards** get level, durability and rarity (flags `0x13`, chosen by the install's Shield slot). Does the game load an added ward like one of its own?
+  - **Five items changed their fixed level:** the Enhanced Spiked, Mace-like and Iron Claw clubs (now 1–50) and the Gem of Skulls (now 1–105) can be levelled; the Shroud Meteor Scroll is now fixed at 20. Does the game keep these levels?
+  - **Butter** is now under Consumables (Materials in the reference). Is that where the game has it?
+  - **Gem levels above 55:** gems take 1–105, in the install and the reference alike. Does the game keep a gem written above 55?
+  - **Icons after a game patch:** WebView2 may still show the old icons of the previous build. Do the new ones show after a game update?
+  - **First launch on a cold disk:** about 0.4 s to read the install and 0.18 s for the first icon, both measured with a warm file cache. How long is it after a reboot?
+  - **Install files held open:** the editor keeps `enshrouded.kfc_resources` and the `.dat` files it read icons from open until it closes. With icons shown, can Enshrouded still start, and Steam still update it?
