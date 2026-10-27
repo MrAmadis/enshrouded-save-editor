@@ -313,7 +313,7 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
 - **Workflow** (owner's standing rules):
   - work on feature branches, merged back to main when done;
   - the owner tests locally before anything is pushed.
-- **Distribution:** for the owner's personal use, built on the owner's machine. There's no public release, release pipeline or code signing. *(my call, as in Stoneshard)*
+- **Distribution:** for the owner's personal use, built on the owner's machine. There's no public release, release pipeline or code signing. *(my call, as in Stoneshard)* *(Since 2026-10-27: released on Nexus Mods as 1.0.0, as Stoneshard was. It is still built on the owner's machine and unsigned, and the GitHub repo is public. The mod page is called "Enshrouded Savegame Editor" because another mod already had "Enshrouded Save Editor"; the app keeps its own name (owner).)*
 
 ## 10. Risks and unknowns to settle during the build
 
