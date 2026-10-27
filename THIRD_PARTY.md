@@ -101,4 +101,4 @@ SOFTWARE.
 ## Enshrouded's game icon (Keen Games)
 
 - **What we use:** `src/EnshroudedSaveEditor.App/app.ico`, the application's icon, is the icon of `enshrouded.exe` recoloured: the stone tablet in bronze and the Flame sigil in the editor's pale gold (owner's choice, 2026-10-26). Each size was recoloured from the game's own image at that size.
-- **License:** the artwork belongs to Keen Games. It is used here only as the icon of this personal, unpublished tool, and is the one piece of game content committed to this repo (owner's decision, 2026-10-26).
+- **License:** the artwork belongs to Keen Games. Apart from the reference data above, it is the one piece of game content committed to this repo (owner's decision, 2026-10-26). It stays the icon in the public release on Nexus Mods: the exe, the window, and the mod page's logo and banner (owner's decision, 2026-10-27, after an original icon was offered).
