@@ -47,7 +47,7 @@
     }
     @if (_notice is var (kind, text))
     {
-        <Banner Kind="@kind">
+        <Banner @key="_noticeId" Kind="@kind" OnClose="CloseNotice" Timeout="@(kind == "error" || _offerReload ? null : NoticeTime)">
             <span>@text</span>
             @if (_offerReload)
             {
@@ -93,6 +93,9 @@
     private static readonly string[] Tabs = ["Character", "Inventory", "Skills"];
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(3);
 
+    /// <summary>How long an info or warning message stays (owner, 2026-10-27); errors and offers stay until closed.</summary>
+    private static readonly TimeSpan NoticeTime = TimeSpan.FromSeconds(6);
+
     private string _tab = Tabs[0];
     private bool _running;
     private bool _showBackups;
@@ -100,6 +103,7 @@
     private bool _confirmOverspend;
     private bool _offerReload;
     private (string Kind, string Text)? _notice;
+    private int _noticeId;   // a new message gets a new banner, so its countdown starts again
     private readonly CancellationTokenSource _stop = new();
 
     protected override void OnInitialized()
@@ -154,11 +158,10 @@
         }
         catch (EditRejectedException e)
         {
-            (_notice, _offerReload) = (("error", e.Message), false);
+            Notify("error", e.Message);
             return;
         }
-        _offerReload = result == SaveResult.ChangedOnDisk;
-        _notice = result switch
+        var (kind, text) = result switch
         {
             SaveResult.Saved => ("info", "Saved. Backup kept."),
             SaveResult.GameRunning => ("warn", "Enshrouded is running. Close it to save."),
@@ -166,7 +169,21 @@
             SaveResult.VerifyFailed => ("error", "Save check failed; your file was restored from the backup."),
             _ => ("error", $"This save is read-only: {EditorService.Current.ReadOnlyReason}"),
         };
+        Notify(kind, text, offerReload: result == SaveResult.ChangedOnDisk);
         _running = result == SaveResult.GameRunning || _running;
+    }
+
+    private void Notify(string kind, string text, bool offerReload = false)
+    {
+        _notice = (kind, text);
+        _offerReload = offerReload;
+        _noticeId++;
+    }
+
+    private void CloseNotice()
+    {
+        _notice = null;
+        _offerReload = false;
     }
 
     private void Reload()
@@ -174,20 +191,18 @@
         try
         {
             EditorService.Reload();
-            _notice = null;
+            CloseNotice();
         }
         catch (EditRejectedException e)
         {
-            _notice = ("error", e.Message);
+            Notify("error", e.Message);
         }
-        _offerReload = false;
     }
 
     private void CloseBackups()
     {
         _showBackups = false;
-        _notice = null;
-        _offerReload = false;
+        CloseNotice();
     }
 
     private void Back()

@@ -1,7 +1,28 @@
-<div class="banner banner-@Kind" role="status">@ChildContent</div>
+<div class="banner banner-@Kind" role="status">
+    @ChildContent
+    @if (OnClose.HasDelegate)
+    {
+        <button class="banner-close" title="Close" aria-label="Close" @onclick="OnClose">
+            <svg viewBox="0 0 10 10" aria-hidden="true"><path d="M1 1 9 9M9 1 1 9" /></svg>
+        </button>
+        @if (Timeout is { } timeout)
+        {
+            <div class="banner-countdown" style="animation-duration: @timeout.TotalSeconds.ToString(CultureInfo.InvariantCulture)s" @onanimationend="OnClose"></div>
+        }
+    }
+</div>
 
 @code {
     /// <summary>warn, error or info.</summary>
     [Parameter] public string Kind { get; set; } = "warn";
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Closes a one-off message; when set, the banner has a close button.</summary>
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>
+    /// With <see cref="OnClose"/>: how long the message stays. A faint bar along the bottom edge counts it down (hovering
+    /// pauses it), and the message closes when the bar runs out.
+    /// </summary>
+    [Parameter] public TimeSpan? Timeout { get; set; }
 }

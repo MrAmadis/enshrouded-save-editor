@@ -199,9 +199,85 @@ public sealed class ShellTests : IDisposable
 
         Assert.Equal("The file changed since you opened it. Reload reads it again and drops your unsaved edits.",
             cut.Find(".banner span").TextContent.Trim());
+        Assert.Empty(cut.FindAll(".banner-countdown"));   // an offer stays until it is taken or closed
         cut.Find("button.reload").Click();
         Assert.Empty(editor.Current.Pending);
         Assert.Equal(18, editor.Current.Level);
+        Assert.Empty(cut.FindAll(".banner"));
+    }
+
+    // Owner, 2026-10-27: one-off messages have a close button, and info and warning ones close themselves after a countdown
+    // (a bar along the banner's bottom edge, shrinking right to left; its CSS animation ending closes the message).
+    [Fact]
+    public void A_saved_notice_counts_down_and_closes_itself()
+    {
+        var editor = Start();
+        editor.Open(C(0));
+        editor.SetLevel(10);
+        var cut = _ctx.Render<Editor>();
+        cut.Find("button.save").Click();
+
+        cut.Find(".banner .banner-countdown").TriggerEvent("onanimationend", EventArgs.Empty);
+
+        Assert.Empty(cut.FindAll(".banner"));
+    }
+
+    [Fact]
+    public void A_notice_can_be_closed()
+    {
+        var editor = Start();
+        editor.Open(C(0));
+        editor.SetLevel(10);
+        var cut = _ctx.Render<Editor>();
+        cut.Find("button.save").Click();
+
+        cut.Find(".banner button.banner-close").Click();
+
+        Assert.Empty(cut.FindAll(".banner"));
+        Assert.Empty(editor.Current.Pending);   // closing changes nothing else
+    }
+
+    // An error isn't missed: it stays until closed.
+    [Fact]
+    public void An_error_notice_stays_until_closed()
+    {
+        var editor = Start();
+        editor.Open(C(2));
+        editor.SetLevel(10);
+        editor.OpenSession!.VerifyOverride = () => false;
+        var cut = _ctx.Render<Editor>();
+        cut.Find("button.save").Click();
+
+        Assert.Empty(cut.FindAll(".banner-countdown"));
+        cut.Find(".banner button.banner-close").Click();
+        Assert.Empty(cut.FindAll(".banner"));
+    }
+
+    // A state (the game running, a read-only save) goes when the state ends; it can't be closed.
+    [Fact]
+    public void A_state_banner_has_no_close_button_or_countdown()
+    {
+        _probe.Game = true;
+        var editor = Start();
+        editor.Open(C(2));
+        var cut = _ctx.Render<Editor>();
+
+        Assert.Single(cut.FindAll(".banner"));
+        Assert.Empty(cut.FindAll(".banner-close, .banner-countdown"));
+    }
+
+    [Fact]
+    public void Picker_open_error_can_be_closed()
+    {
+        File.WriteAllBytes(C(0), [1, 2, 3]);
+        Start();
+        var cut = _ctx.Render<CharacterPicker>();
+
+        cut.Find("[data-file='character0.ksd']").Click();
+        Assert.Contains("couldn't be opened", cut.Find(".banner").TextContent);
+        Assert.Empty(cut.FindAll(".banner-countdown"));
+        cut.Find(".banner button.banner-close").Click();
+
         Assert.Empty(cut.FindAll(".banner"));
     }
 

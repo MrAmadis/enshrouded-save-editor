@@ -20,7 +20,7 @@
     }
     @if (_error is not null)
     {
-        <Banner Kind="error">@_error</Banner>
+        <Banner Kind="error" OnClose="() => _error = null">@_error</Banner>
     }
 
     @foreach (var group in _characters.GroupBy(c => SourceTag(c.Path)).OrderBy(g => g.Key is null ? 2 : g.Key == "Steam" ? 0 : 1))

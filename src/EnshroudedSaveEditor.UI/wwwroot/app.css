@@ -114,6 +114,36 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .banner-error { background: rgba(178, 58, 92, .16); border-color: var(--danger-line); color: #f0bccb; }
 .banner-info { background: rgba(91, 179, 90, .12); border-color: rgba(91, 179, 90, .6); color: #c6e8c4; }
 .banner .btn { padding: 4px 10px; }
+/* One-off messages: a close button, and for timed ones a faint bar shrinking right to left; hovering pauses it. */
+.banner:has(.banner-close) { position: relative; overflow: hidden; }
+.banner-close {
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    opacity: .6;
+    cursor: pointer;
+}
+.banner-close:hover { opacity: 1; }
+.banner-close svg { width: 10px; height: 10px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+.banner-countdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: currentColor;
+    opacity: .25;
+    transform-origin: left;
+    animation: banner-countdown linear forwards;
+}
+.banner:hover .banner-countdown { animation-play-state: paused; }
+@keyframes banner-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
 /* Character picker */
 .picker { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
