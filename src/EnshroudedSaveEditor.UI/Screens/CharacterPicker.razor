@@ -7,21 +7,23 @@
         <p class="muted">Choose a character to edit. Every save keeps a backup of the previous version.</p>
     </header>
 
-    @if (_running)
-    {
-        <Banner>Enshrouded is running. Close it to save.</Banner>
-    }
-    @if (!_savesFound)
-    {
-        <Banner Kind="error">
-            <span>No Enshrouded saves found.</span>
-            <button class="btn choose-saves" @onclick="ChooseFolder">Choose saves folder</button>
-        </Banner>
-    }
-    @if (_error is not null)
-    {
-        <Banner Kind="error" OnClose="() => _error = null">@_error</Banner>
-    }
+    <div class="notices">
+        @if (_running)
+        {
+            <Banner>Enshrouded is running. Close it to save.</Banner>
+        }
+        @if (!_savesFound)
+        {
+            <Banner Kind="error">
+                <span>No Enshrouded saves found.</span>
+                <button class="btn choose-saves" @onclick="ChooseFolder">Choose saves folder</button>
+            </Banner>
+        }
+        @if (_error is not null)
+        {
+            <Banner Kind="error" OnClose="() => _error = null">@_error</Banner>
+        }
+    </div>
 
     @foreach (var group in _characters.GroupBy(c => SourceTag(c.Path)).OrderBy(g => g.Key is null ? 2 : g.Key == "Steam" ? 0 : 1))
     {

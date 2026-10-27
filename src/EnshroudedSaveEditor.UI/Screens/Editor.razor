@@ -21,40 +21,42 @@
         }
     </nav>
 
-    @if (_running)
-    {
-        <Banner>Enshrouded is running. Close it to save.</Banner>
-    }
-    @if (s.ReadOnly)
-    {
-        <Banner Kind="error">This save is read-only: @s.ReadOnlyReason</Banner>
-    }
-    @if (_confirmBack)
-    {
-        <Banner Kind="warn">
-            <span>Leave this character and drop @s.Pending.Count unsaved @(s.Pending.Count == 1 ? "edit" : "edits")?</span>
-            <button class="btn discard" @onclick="Discard">Drop and leave</button>
-            <button class="btn" @onclick="() => _confirmBack = false">Stay</button>
-        </Banner>
-    }
-    @if (_confirmOverspend)
-    {
-        <Banner Kind="warn">
-            <span>Your skills cost more than this level gives. If you save like this, the game resets your whole skill tree when it loads.</span>
-            <button class="btn confirm-overspend" @onclick="SaveAnyway">Save anyway</button>
-            <button class="btn cancel-overspend" @onclick="() => _confirmOverspend = false">Cancel</button>
-        </Banner>
-    }
-    @if (_notice is var (kind, text))
-    {
-        <Banner @key="_noticeId" Kind="@kind" OnClose="CloseNotice" Timeout="@(kind == "error" || _offerReload ? null : NoticeTime)">
-            <span>@text</span>
-            @if (_offerReload)
-            {
-                <button class="btn reload" @onclick="Reload">Reload</button>
-            }
-        </Banner>
-    }
+    <div class="notices">
+        @if (_running)
+        {
+            <Banner>Enshrouded is running. Close it to save.</Banner>
+        }
+        @if (s.ReadOnly)
+        {
+            <Banner Kind="error">This save is read-only: @s.ReadOnlyReason</Banner>
+        }
+        @if (_confirmBack)
+        {
+            <Banner Kind="warn">
+                <span>Leave this character and drop @s.Pending.Count unsaved @(s.Pending.Count == 1 ? "edit" : "edits")?</span>
+                <button class="btn discard" @onclick="Discard">Drop and leave</button>
+                <button class="btn" @onclick="() => _confirmBack = false">Stay</button>
+            </Banner>
+        }
+        @if (_confirmOverspend)
+        {
+            <Banner Kind="warn">
+                <span>Your skills cost more than this level gives. If you save like this, the game resets your whole skill tree when it loads.</span>
+                <button class="btn confirm-overspend" @onclick="SaveAnyway">Save anyway</button>
+                <button class="btn cancel-overspend" @onclick="() => _confirmOverspend = false">Cancel</button>
+            </Banner>
+        }
+        @if (_notice is var (kind, text))
+        {
+            <Banner @key="_noticeId" Kind="@kind" OnClose="CloseNotice" Timeout="@(kind == "error" || _offerReload ? null : NoticeTime)">
+                <span>@text</span>
+                @if (_offerReload)
+                {
+                    <button class="btn reload" @onclick="Reload">Reload</button>
+                }
+            </Banner>
+        }
+    </div>
 
     <main class="tab-body">
         @if (_tab == "Character")

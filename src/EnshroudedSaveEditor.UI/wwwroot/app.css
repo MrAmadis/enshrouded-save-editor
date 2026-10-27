@@ -109,10 +109,11 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
     border: 1px solid;
     border-radius: 3px;
     font-size: 13px;
+    background: var(--tint);
 }
-.banner-warn { background: rgba(233, 138, 60, .12); border-color: rgba(233, 138, 60, .6); color: #f3c597; }
-.banner-error { background: rgba(178, 58, 92, .16); border-color: var(--danger-line); color: #f0bccb; }
-.banner-info { background: rgba(91, 179, 90, .12); border-color: rgba(91, 179, 90, .6); color: #c6e8c4; }
+.banner-warn { --tint: rgba(233, 138, 60, .12); border-color: rgba(233, 138, 60, .6); color: #f3c597; }
+.banner-error { --tint: rgba(178, 58, 92, .16); border-color: var(--danger-line); color: #f0bccb; }
+.banner-info { --tint: rgba(91, 179, 90, .12); border-color: rgba(91, 179, 90, .6); color: #c6e8c4; }
 .banner .btn { padding: 4px 10px; }
 /* One-off messages: a close button, and for timed ones a faint bar shrinking right to left; hovering pauses it. */
 .banner:has(.banner-close) { position: relative; overflow: hidden; }
@@ -144,6 +145,14 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 }
 .banner:hover .banner-countdown { animation-play-state: paused; }
 @keyframes banner-countdown { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* A screen's messages float over it instead of pushing it down: a zero-height layer that sticks to the top of the
+   window, its banners stacking out of it on a solid backing so the page under them doesn't show through. flow-root keeps
+   the first banner's top margin inside the layer, so it can't move the page either. */
+.notices { display: flow-root; position: sticky; top: 0; height: 0; z-index: 10; }
+.notices > .banner {
+    background: linear-gradient(var(--tint), var(--tint)), var(--panel-2);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, .6);
+}
 
 /* Character picker */
 .picker { max-width: 1100px; margin: 0 auto; padding: 28px 24px; }
