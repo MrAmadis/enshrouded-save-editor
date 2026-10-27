@@ -152,6 +152,14 @@ Every `keen::ItemInfo` resource (4,262, unique ids) becomes an `ItemInfo`, fille
   them, so `Region` and `Name` are empty (the editor only uses ids and points).
 - **Level cap:** `keen::BalancingTable.playerLevelCap` (50; `itemLevelCap` 55, `playerLevelMax` 100,
   `skillPointsPerLevel` 2).
+- **Map locations** (`KfcMapLocations`, map spec `2026-10-26-map-fog-and-locations-design.md` §6.2): the
+  `keen::ecs::TemplateResource`s with a `keen::ecs::MapMarker` component and a
+  `keen::ecs::RuntimeMapMarkerUnlockRequirements` one. Their hint and visible states that are `SimpleBool` equals 1 on a
+  Bool of `GameKnowledgeResource.playerKnowledge` give the ids; a marker using an id that is any marker's completed state,
+  or a skill-point reward id, is left out. The name is the marker's `markerId` loca tag, else the template's
+  `LocaTagComponent`, else the template name. 271 locations in this build. The templates are read in storage order
+  (`KfcResources.AllInFileOrder`): in the type's own order, the four-chunk cache misses nearly every time (6.6 s instead of
+  0.1 s).
 - **XP per level: not in the install.** `BalancingTable.experienceNeedPerLevel` has only five values (1000, 2023, 3046,
   4069, 5092); the table for 49 levels isn't stored, so `XpPerLevel` stays unknown (from the reference: null).
 

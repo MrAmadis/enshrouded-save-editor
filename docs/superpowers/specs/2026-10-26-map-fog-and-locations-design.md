@@ -1,7 +1,7 @@
 # Map: Fog of War and Locations — Design
 
 Date: 2026-10-26
-Status: **Clear fog of war is built** and works in-game (owner, 2026-10-27; §8, check 1). **Discover all locations is on hold** (owner, 2026-10-27: "just the fog of war removal, not location discoveries"); its findings stay below for later.
+Status: **Clear fog of war is built** and works in-game (owner, 2026-10-27; §8, check 1). **Discover all locations is built** too and works in-game (owner, 2026-10-27; §8, check 3), without the Ancient Spires (check 5). It was put on hold earlier that day ("just the fog of war removal, not location discoveries"), then asked for ("Can we also try and add the second one", owner, 2026-10-27).
 
 ## 1. Intent
 
@@ -12,7 +12,7 @@ This revisits the main spec (`2026-10-25-enshrouded-save-editor-design.md`), who
 ## 2. Goals
 
 1. **Clear fog of war** (owner): one action reveals the whole map for the open character.
-2. **Discover all locations** (owner): one action marks the map's locations as discovered for the open character. **On hold** (owner, 2026-10-27).
+2. **Discover all locations** (owner): one action marks the map's locations as discovered for the open character.
 3. The two are separate options (owner).
 
 ## 3. Non-goals *(my calls)*
@@ -88,11 +88,13 @@ All of this was read from the install on this machine with throwaway readers bui
 
 ## 7. The product
 
-§7.2 is built as described; §7.3 is on hold and was never approved.
+§7.2 and §7.3 are built as described.
 
 ### 7.1 Where *(my guess)*
 
-A **Map** panel on the Character tab, below Skill points, with one row per option. Each row shows the character's current state and a button. Only the Fog row exists for now.
+A **Map** panel on the Character tab, below Skill points, with one row per option. Each row shows the character's current state and a button: **Fog** and **Places**.
+
+Both options are marked **experimental and possibly dangerous** (owner, 2026-10-27): an "Experimental" tag beside the panel's title, and a warning note above the rows ("Experimental, possibly dangerous: these options rewrite the character's map data, and not every effect in the game has been tested. Places discovered here probably won't give their discovery XP later. Saving keeps a backup first."). The note is plain text in the warning colours, not a status banner, because it is always there.
 
 ### 7.2 Clear fog of war
 
@@ -105,12 +107,19 @@ A **Map** panel on the Character tab, below Skill points, with one row per optio
 
 ### 7.3 Discover all locations
 
-- **What it does:** adds each of the §6.2 hint and visible ids that the character doesn't have yet, with value 1.
+- **Which locations:** every marker whose hint or visible state is `SimpleBool` equals 1 on a Bool of player knowledge, with those ids (`KfcMapLocations`). Two kinds of marker are left out entirely *(my calls)*:
+  - a marker using an id that is also **some marker's completed state**. There are 17 such ids: a Gem Forge's hint is its region's Night Sanctum gem station completed, and the same goes for Shroud Root nests and Fog Well plants, and for the Ancient Lands dungeon entrances. Setting them could count as finishing those places. They unlock as the game is played;
+  - a marker using a **skill-point reward id** (none in this build; a guard, main spec §10.5).
+
+  This leaves **271 locations (393 ids)** in the install's build. "Fog Test" had discovered 21 of them.
+- **What it does:** adds each of those ids that the character doesn't have yet, with value 1.
   - New entries go after the existing ones. The game appended a learned skill the same way (main spec §10.5) *(my call)*.
   - The version and the existing entries stay untouched.
   - Completed conditions are never set.
-- **Status and pending line:** how many of the markers the option can discover are already discovered; pending line "Discovered N locations" *(my guess at the wording)*.
-- **Game data:** the ids come from the install, as a new piece of `GameData` cached with the rest. The embedded reference data has no markers, so when the install can't be read, this option is disabled, with the reason *(my call)*.
+- **Status:** "21 of 271 discovered"; a location counts when the character knows every one of its ids. The button is disabled when all are discovered.
+- **Pending line:** "Discovered 250 locations" (singular for one).
+- **Game data:** the ids come from the install, as a new piece of `GameData` cached with the rest (cache format 2). The 12,267 templates are read in the order they are stored, which takes about 0.1 s instead of 6.6 s. The embedded reference data has no markers, so when the install can't be read, the button is disabled, with the reason *(my call)*.
+- **No `player_knowledge` section** (a character that hasn't been in a world): the button is disabled, with the same reason as the fog.
 - **Known trade-off:** for 288 of the ids, the game normally gives discovery XP when you arrive. If the editor sets them first, that XP is probably not given later.
 
 ### 7.4 Both options
@@ -128,19 +137,17 @@ Every check runs on a **local test copy** made with the Lab tool, in a new throw
 
 1. **Fog fully cleared:** the game loads the grid, the whole map shows clear, and the result is kept after the game saves. Cells outside the playable area cause no problem. **Works** (owner, 2026-10-27; `docs/research/in-game-findings.md`).
 2. **Rule-less markers** (not reported yet): after clearing the fog alone, are Midhollow, Fox Chase and the Ancient Spires shown? This settles the guess in §6.2.
-3. **Discover:**
+3. **Discover** — **works** (owner, 2026-10-27: the places show and are kept after the game saves; nothing else changed that the owner could see):
    - the game loads the appended entries and shows the markers;
    - it keeps them after it saves;
    - nothing else changes: quests, skill points and achievements.
 4. **The 32 ids in both registries:** is the player side enough?
-5. **Ancient Spires:** are they usable for fast travel after Discover? This only matters if the owner wants fast travel (§9).
+5. **Ancient Spires:** are they usable for fast travel after Discover? **No** (owner, 2026-10-27): no new spire shows, as expected from their rule-less markers (§6.2).
 6. **Discovery XP:** none is granted on load. Check whether visiting a discovered place later gives any.
 
 ## 9. Open questions for the owner
 
-On hold with Discover all locations (owner, 2026-10-27).
-
-1. **Fast travel:** is being able to fast-travel to every Ancient Spire part of "discover all locations", or is seeing every place on the map enough? If fast travel is in, finding where spire activation is stored is more research (§6.3), and it may turn out to be in the world save, which the editor doesn't write.
+1. **Fast travel** (still open; in-game check 5 showed it doesn't come with Discover): is being able to fast-travel to every Ancient Spire part of "discover all locations", or is seeing every place on the map enough? If fast travel is in, finding where spire activation is stored is more research (§6.3), and it may turn out to be in the world save, which the editor doesn't write.
 
 ## 10. Left to the builder
 

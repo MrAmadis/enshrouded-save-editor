@@ -38,7 +38,7 @@ A save editor for **Enshrouded 1.0** that lets the owner change their character'
 
 *(my calls; the owner didn't ask for these)*
 - World saves (`worldN.ksd`): chests, bases, NPCs, the world itself.
-- Fog of war (`fogofwar`), unlocking Elixir Wells and Shroud Roots, recipes and other `player_knowledge` edits. These are read only, for the points budget. *(Since 2026-10-27, clearing the fog of war is in: see `2026-10-26-map-fog-and-locations-design.md`.)*
+- Fog of war (`fogofwar`), unlocking Elixir Wells and Shroud Roots, recipes and other `player_knowledge` edits. These are read only, for the points budget. *(Since 2026-10-27, clearing the fog of war and discovering the map's locations are in: see `2026-10-26-map-fog-and-locations-design.md`.)*
 - Appearance and customization items (hair and similar). They are kept untouched and are not shown as inventory.
 - `global.ksd`: known players, adventure subscriptions, user data.
 - Status effects (buffs) and the `voiceover` section.
@@ -227,6 +227,7 @@ The approved mockups are in `docs/superpowers/specs/mockups/`. Open them in a br
   3. writes it through a temporary file and an atomic rename;
   4. reads it back and verifies it;
   5. reports the result.
+- **Messages along the top** (owner, 2026-10-27): a one-off message (a save's result, a character that couldn't be opened) has a close button (×). Info and warning messages close themselves after 6 seconds; a faint bar along the bottom edge shrinks right to left to show the time left, and hovering pauses it. Errors, and messages with a button (Reload), stay until closed, so a failure isn't missed *(my call)*. Banners for a state (the game running, a read-only save) and questions (leave without saving?) can't be closed; they go when the state ends or the question is answered.
 - **Backups view:** lists this character's backups and can restore one. A restore also takes a fresh backup of the current file first.
 - **Backup location:** `%LOCALAPPDATA%\EnshroudedSaveEditor\backups\characterN\<timestamp>.ksd`. That is outside the Steam folder, so neither the game nor Steam Cloud sees it. *(my call)*
 

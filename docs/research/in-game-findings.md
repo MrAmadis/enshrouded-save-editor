@@ -149,6 +149,20 @@ game.
 - Not reported: whether markers with no unlock rule (Midhollow, Fox Chase, the Ancient Spires) show without a visit
   (map spec §8, check 2). It only matters for the on-hold Discover all locations.
 
+## Discover all locations — 2026-10-27
+
+"Places Test", a fresh Lab copy of Steam character2 (21 of the 271 locations discovered), in the local folder as
+`character3.ksd`. The owner discovered all locations in the editor, saved, and played it in the game. Its fog was cleared
+as well.
+
+- **The discovered places show on the map, and they are kept after the game saves** (owner). Appending the knowledge
+  entries works (map spec §8, check 3).
+- **Nothing else changed** that the owner could see: quests, skill points, achievements.
+- **No Ancient Spire was added.** As expected: the spires' markers have no unlock rule (map spec §6.2), so Discover
+  doesn't touch them, and fast travel to a spire not yet visited doesn't come with it (check 5).
+- Not checked: whether discovered places show under the fog (the copy's fog was cleared too; check 2), the ids in both
+  registries apart (check 4), and discovery XP when a discovered place is visited (check 6).
+
 ## Still open
 
 - ~~The in-game name box limit~~: 15 characters (owner, above).
