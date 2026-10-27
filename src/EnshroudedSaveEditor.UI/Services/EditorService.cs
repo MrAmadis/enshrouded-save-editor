@@ -267,6 +267,15 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         return ChangeLog.Xp(old, xp);
     });
 
+    // Map
+
+    /// <summary>Reveals the whole map (<see cref="MapEditor.ClearFog"/>).</summary>
+    public SessionView ClearFog() => Edit(s =>
+    {
+        new MapEditor(s).ClearFog();
+        return ChangeLog.ClearedFog;
+    });
+
     // Inventory (see InventoryEditor for the rules)
 
     public SessionView SetCount(ItemRef r, int count) => Edit(s =>
@@ -414,7 +423,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         return ChangeLog.RefundedAll;
     });
 
-    /// <summary>Reverts the last edit: its three records, change count and pending line.</summary>
+    /// <summary>Reverts the last edit: its three records, fog of war, change count and pending line.</summary>
     public SessionView Undo()
     {
         lock (_lock)
@@ -571,7 +580,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         return new SessionView(
             s.Path, Path.GetFileName(s.Path), s.Character.Name, level, s.Player.Xp, data.LevelCap, s.ReadOnly, s.ReadOnlyReason,
             s.Player.InventoryStatus, equipped, backpack, hotbar, skills.Points(), nodes, data.Tree.Links, data.Tree.Labels,
-            _log.Lines, _undo.Count > 0, XpToNextLevel(data, level), overflow);
+            _log.Lines, _undo.Count > 0, XpToNextLevel(data, level), overflow, new MapEditor(s).Fog);
     }
 
     /// <summary>The attributes, by the word the game's text uses, with the tag the skill tree shows.</summary>

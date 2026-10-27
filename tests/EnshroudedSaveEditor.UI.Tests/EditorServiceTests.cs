@@ -160,6 +160,34 @@ public sealed class EditorServiceTests : IDisposable
     }
 
     [Fact]
+    public void ClearFog_is_an_edit_that_undo_reverts()
+    {
+        var e = Start();
+        Assert.Equal(FogStatus.Fogged, e.Open(C(2)).Fog);
+
+        var cleared = e.ClearFog();
+        Assert.Equal(FogStatus.Cleared, cleared.Fog);
+        Assert.Equal(["Cleared fog of war"], cleared.Pending);
+        Assert.Equal("Already cleared", Rejected(() => e.ClearFog()).Message);
+
+        var undone = e.Undo();
+        Assert.Equal(FogStatus.Fogged, undone.Fog);
+        Assert.Empty(undone.Pending);
+    }
+
+    [Fact]
+    public void A_cleared_fog_is_saved()
+    {
+        var e = Start();
+        e.Open(C(2));
+        e.ClearFog();
+
+        Assert.Equal(SaveResult.Saved, e.Save());
+
+        Assert.Equal(FogStatus.Cleared, Start().Open(C(2)).Fog);
+    }
+
+    [Fact]
     public void Undo_keeps_the_last_50_edits()
     {
         var e = Start();

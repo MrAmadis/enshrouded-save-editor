@@ -53,6 +53,7 @@ public sealed record SkillNodeView(
 /// <param name="XpToNextLevel">The XP from this level to the next (R6); null when the XP table is unknown or at the cap.</param>
 /// <param name="Overflow">Records outside the grid the UI shows: Extra slots past the equipped backpack's extension, and
 /// Inventory slots past 39. They are kept as they are; the UI lists them so they can be moved or removed.</param>
+/// <param name="Fog">The map's fog of war (<see cref="MapEditor.Fog"/>).</param>
 public sealed record SessionView(
     string Path,
     string FileName,
@@ -73,7 +74,8 @@ public sealed record SessionView(
     IReadOnlyList<string> Pending,
     bool CanUndo,
     uint? XpToNextLevel,
-    IReadOnlyList<SlotView> Overflow);
+    IReadOnlyList<SlotView> Overflow,
+    FogStatus Fog);
 
 /// <summary>An item the Add item browser offers.</summary>
 /// <param name="SubCategory">The weapon type for Weapons ("RangedBow"; "" when it has none), the <see cref="EquipSlot"/>

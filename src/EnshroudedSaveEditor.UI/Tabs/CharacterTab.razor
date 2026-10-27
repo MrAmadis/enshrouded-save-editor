@@ -60,12 +60,26 @@
             <Banner Kind="error"><span class="overspend">Your skills cost more than this level gives. Refund skills first.</span></Banner>
         }
     </section>
+
+    <section class="panel">
+        <h3>Map</h3>
+        <div class="field-row fog-row">
+            <span class="field-label">Fog</span>
+            <span class="fog-status muted">@FogText(s.Fog)</span>
+            <button class="btn clear-fog" disabled="@(s.ReadOnly || s.Fog != FogStatus.Fogged)" @onclick="OnClearFog">Clear fog of war</button>
+        </div>
+        @if (_fogError is not null)
+        {
+            <div class="field-error">@_fogError</div>
+        }
+    </section>
 </div>
 
 @code {
     private string? _nameError;
     private string? _levelError;
     private string? _xpError;
+    private string? _fogError;
 
     private ElementReference _tab;
     private IJSObjectReference? _fit;
@@ -129,6 +143,15 @@
             return;
         _xpError = Try(() => EditorService.SetXp(xp));
     }
+
+    private void OnClearFog() => _fogError = Try(() => EditorService.ClearFog());
+
+    private static string FogText(FogStatus fog) => fog switch
+    {
+        FogStatus.Fogged => "Partly explored",
+        FogStatus.Cleared => "The whole map is revealed",
+        _ => MapEditor.Explain(fog),
+    };
 
     private static string? Try(Action edit)
     {

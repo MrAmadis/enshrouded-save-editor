@@ -161,6 +161,73 @@ public class SaveSessionTests : IDisposable
     }
 
     [Fact]
+    public void Open_reads_the_fog_when_the_character_has_one()
+    {
+        Assert.False(Open().Fog!.IsCleared);
+
+        var local = Fixtures.CopyLocalToTemp();
+        try
+        {
+            Assert.Null(SaveSession.Open(Path.Combine(local, "character0.ksd"), Fixtures.ItemIds().Contains).Fog);
+        }
+        finally
+        {
+            try { Directory.Delete(local, true); } catch { }
+        }
+    }
+
+    [Fact]
+    public void A_fog_in_an_unknown_layout_is_left_alone_and_the_save_stays_writable()
+    {
+        var file = KsdFile.Parse(File.ReadAllBytes(P));
+        file["fogofwar"].SetData([1, 2, 3]);
+        File.WriteAllBytes(P, file.ToBytes());
+        var block = KsdFile.Parse(File.ReadAllBytes(P))["fogofwar"].Block.ToArray();
+
+        var s = Open();
+        Assert.False(s.ReadOnly);
+        Assert.Null(s.Fog);
+        s.Player.Level = 8; s.MarkChanged();
+        Assert.Equal(SaveResult.Saved, s.Save(Backups, new FakeProbe()));
+
+        Assert.Equal(block, KsdFile.Parse(File.ReadAllBytes(P))["fogofwar"].Block.ToArray());
+    }
+
+    [Fact]
+    public void Save_writes_a_cleared_fog_and_keeps_the_other_sections()
+    {
+        var orig = KsdFile.Parse(File.ReadAllBytes(P));
+        var s = Open();
+        s.Fog = s.Fog!.Cleared(); s.MarkChanged();
+
+        Assert.Equal(SaveResult.Saved, s.Save(Backups, new FakeProbe()));
+
+        var after = KsdFile.Parse(File.ReadAllBytes(P));
+        var fog = after["fogofwar"].GetData();
+        Assert.Equal(orig["fogofwar"].GetData()[..13], fog[..13]);
+        Assert.True(fog.AsSpan(13).IndexOfAnyExcept((byte)255) < 0);
+        Assert.True(after["fogofwar"].ChecksumValid);
+        foreach (var o in orig.Sections.Where(x => x.Name != "fogofwar"))
+            Assert.True(o.Block.Span.SequenceEqual(after[o.Name].Block.Span), o.Name);
+        Assert.True(Open().Fog!.IsCleared);
+    }
+
+    [Fact]
+    public void Snapshot_restores_the_fog()
+    {
+        var orig = KsdFile.Parse(File.ReadAllBytes(P))["fogofwar"].Block.ToArray();
+        var s = Open();
+        var before = s.Snapshot();
+        s.Fog = s.Fog!.Cleared(); s.MarkChanged();
+
+        s.Restore(before);
+        Assert.False(s.Fog!.IsCleared);
+        Assert.Equal(SaveResult.Saved, s.Save(Backups, new FakeProbe()));
+
+        Assert.Equal(orig, KsdFile.Parse(File.ReadAllBytes(P))["fogofwar"].Block.ToArray());
+    }
+
+    [Fact]
     public void Restore_refuses_a_snapshot_that_does_not_read_back()
     {
         var s = Open();

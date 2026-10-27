@@ -269,6 +269,8 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .points dd { text-align: right; font-weight: 600; color: var(--gold-2); }
 .points dd.negative { color: #e5586f; }
 .points .banner { margin-top: 12px; }
+.fog-row { margin-bottom: 0; }
+.fog-status { flex: 1; }
 
 /* Rarity colours (text) */
 .c-common, .chip.c-common { color: var(--common); }

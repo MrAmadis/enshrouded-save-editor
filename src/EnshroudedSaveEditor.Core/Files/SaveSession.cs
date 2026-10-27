@@ -6,27 +6,32 @@ namespace EnshroudedSaveEditor.Core.Files;
 
 public enum SaveResult { Saved, GameRunning, ChangedOnDisk, ReadOnly, VerifyFailed }
 
-/// <summary>The three records as bytes, plus the change count: what <see cref="SaveSession.Restore"/> puts back (undo).</summary>
-public sealed record SessionSnapshot(byte[] Character, byte[] Player, byte[] Knowledge, int ChangeCount);
+/// <summary>
+/// The three records as bytes, the fog of war (immutable, so kept as it is), plus the change count: what
+/// <see cref="SaveSession.Restore"/> puts back (undo).
+/// </summary>
+public sealed record SessionSnapshot(byte[] Character, byte[] Player, byte[] Knowledge, FogOfWar? Fog, int ChangeCount);
 
 public sealed class SaveSession
 {
     const string CharacterSection = "character_data";
     const string PlayerSection = "player_character";
     const string KnowledgeSection = "player_knowledge";
+    const string FogSection = "fogofwar";
 
     byte[] _hash;
     byte[] _origCharacter;
     byte[] _origPlayer;
     byte[]? _origKnowledge;
+    byte[]? _origFog;
     readonly Func<uint, bool> _isItem;
 
     SaveSession(string path, KsdFile file, byte[] hash, CharacterData character, PlayerCharacter player,
-        PlayerKnowledge knowledge, byte[] origCharacter, byte[] origPlayer, byte[]? origKnowledge,
-        string? readOnlyReason, Func<uint, bool> isItem)
+        PlayerKnowledge knowledge, FogOfWar? fog, byte[] origCharacter, byte[] origPlayer, byte[]? origKnowledge,
+        byte[]? origFog, string? readOnlyReason, Func<uint, bool> isItem)
     {
-        Path = path; File = file; _hash = hash; Character = character; Player = player; Knowledge = knowledge;
-        _origCharacter = origCharacter; _origPlayer = origPlayer; _origKnowledge = origKnowledge;
+        Path = path; File = file; _hash = hash; Character = character; Player = player; Knowledge = knowledge; Fog = fog;
+        _origCharacter = origCharacter; _origPlayer = origPlayer; _origKnowledge = origKnowledge; _origFog = origFog;
         ReadOnlyReason = readOnlyReason; _isItem = isItem;
     }
 
@@ -35,6 +40,9 @@ public sealed class SaveSession
     public CharacterData Character { get; set; }
     public PlayerCharacter Player { get; private set; }
     public PlayerKnowledge Knowledge { get; private set; }
+
+    /// <summary>Null when the character has no <c>fogofwar</c> section or its layout isn't recognised; it is then left untouched.</summary>
+    public FogOfWar? Fog { get; set; }
     public bool ReadOnly => ReadOnlyReason is not null;
     public string? ReadOnlyReason { get; }
     public int ChangeCount { get; private set; }
@@ -45,7 +53,7 @@ public sealed class SaveSession
     internal Func<bool>? VerifyOverride { get; set; }
 
     /// <summary>The records as they stand now, for <see cref="Restore"/>.</summary>
-    public SessionSnapshot Snapshot() => new(Character.ToBytes(), Player.ToBytes(), Knowledge.ToBytes(), ChangeCount);
+    public SessionSnapshot Snapshot() => new(Character.ToBytes(), Player.ToBytes(), Knowledge.ToBytes(), Fog, ChangeCount);
 
     /// <summary>
     /// Puts back a <see cref="Snapshot"/> of this session. The records are read back from its bytes, and nothing
@@ -63,6 +71,7 @@ public sealed class SaveSession
         Character = character;
         Player = player;
         Knowledge = knowledge;
+        Fog = snapshot.Fog;
         ChangeCount = snapshot.ChangeCount;
     }
 
@@ -96,9 +105,14 @@ public sealed class SaveSession
         var player = PlayerCharacter.Parse(pcBytes, isItem);
         var knBytes = kn?.GetData();
         var knowledge = PlayerKnowledge.Parse(knBytes ?? [100, 0, 0, 0, 0, 0, 0, 0]);
+        var fogBytes = file.Find(FogSection)?.GetData();
+        FogOfWar? fog = null;
+        if (fogBytes is not null)
+            try { fog = FogOfWar.Parse(fogBytes); }
+            catch (KsdFormatException) { fogBytes = null; }
 
         var reason = problems.Count == 0 ? null : "Opened read-only: " + string.Join("; ", problems) + ".";
-        return new SaveSession(path, file, hash, character, player, knowledge, cdBytes, pcBytes, knBytes, reason, isItem);
+        return new SaveSession(path, file, hash, character, player, knowledge, fog, cdBytes, pcBytes, knBytes, fogBytes, reason, isItem);
     }
 
     public SaveResult Save(BackupService backups, IProcessProbe probe)
@@ -119,9 +133,11 @@ public sealed class SaveSession
             var newCharacter = Character.ToBytes();
             var newPlayer = Player.ToBytes();
             var newKnowledge = _origKnowledge is null ? null : Knowledge.ToBytes();
+            var newFog = _origFog is null ? null : Fog?.ToBytes();
             if (!newCharacter.AsSpan().SequenceEqual(_origCharacter)) File[CharacterSection].SetData(newCharacter);
             if (!newPlayer.AsSpan().SequenceEqual(_origPlayer)) File[PlayerSection].SetData(newPlayer);
             if (newKnowledge is not null && !newKnowledge.AsSpan().SequenceEqual(_origKnowledge)) File[KnowledgeSection].SetData(newKnowledge);
+            if (newFog is not null && !newFog.AsSpan().SequenceEqual(_origFog)) File[FogSection].SetData(newFog);
 
             File.Revision += 1;
             File.SavedAt = DateTimeOffset.FromUnixTimeSeconds(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
@@ -149,6 +165,7 @@ public sealed class SaveSession
             _origCharacter = newCharacter;
             _origPlayer = newPlayer;
             if (newKnowledge is not null) _origKnowledge = newKnowledge;
+            if (newFog is not null) _origFog = newFog;
             ChangeCount = 0;
             saved = true;
             return SaveResult.Saved;

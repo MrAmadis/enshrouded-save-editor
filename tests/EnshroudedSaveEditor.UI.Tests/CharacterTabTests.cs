@@ -153,6 +153,33 @@ public sealed class CharacterTabTests : IDisposable
     }
 
     [Fact]
+    public void Clear_fog_reveals_the_map()
+    {
+        var editor = Start();
+        var cut = _ctx.Render<CharacterTab>();
+        Assert.Equal("Partly explored", cut.Find(".fog-status").TextContent.Trim());
+
+        cut.Find("button.clear-fog").Click();
+
+        Assert.Equal(FogStatus.Cleared, editor.Current.Fog);
+        Assert.Equal(["Cleared fog of war"], editor.Current.Pending);
+        Assert.Equal("The whole map is revealed", cut.Find(".fog-status").TextContent.Trim());
+        Assert.True(cut.Find("button.clear-fog").HasAttribute("disabled"));
+    }
+
+    // The game-made local "Test" character never went into a world, so it has no fog to clear.
+    [Fact]
+    public void Clear_fog_is_off_for_a_character_without_a_map()
+    {
+        File.Copy(Path.Combine(Fixtures.RealLocal, "character0.ksd"), Path.Combine(_root, "character3.ksd"));
+        Start(character: 3);
+        var cut = _ctx.Render<CharacterTab>();
+
+        Assert.Equal(MapEditor.Explain(FogStatus.NoMap), cut.Find(".fog-status").TextContent.Trim());
+        Assert.True(cut.Find("button.clear-fog").HasAttribute("disabled"));
+    }
+
+    [Fact]
     public void Read_only_session_disables_every_control()
     {
         File.WriteAllBytes(Path.Combine(_root, "character2.ksd"),

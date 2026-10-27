@@ -10,6 +10,8 @@ public sealed class ChangeLog
 {
     public const string RefundedAll = "Refunded all skills";
 
+    public const string ClearedFog = "Cleared fog of war";
+
     private readonly List<string> _lines = [];
 
     public int Count => _lines.Count;
