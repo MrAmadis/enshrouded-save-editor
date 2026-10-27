@@ -90,7 +90,7 @@ This is why character1's two entries "take ~57 bytes" (27 + 30), not 54, and why
 
 **Writing (`PlayerCharacter.ToBytes`):**
 - Inventory and Extra counts are rewritten from the lists in `Full`.
-- The Equipped mask, its u16 fields and the record count can't change. When the game changes header byte 2 isn't known (§4). An Equipped record can be swapped for another, which keeps the count.
+- The Equipped mask is its own part (`MaskPart`), written back from `PlayerCharacter.EquippedMask`. `Equip` and `Unequip` change its bits 0–15 and the Equipped records together (mask-bit order, slot bytes 0…n−1), and `ToBytes` refuses records the bits don't count. Bits 16–18 and their u16 fields are kept as read (§4). The fallback layouts can't change the Equipped records.
 - `ToBytes` refuses anything it couldn't read back: slots out of order, an Equipped slot byte that isn't its index (`Full`), count 0 with fields, a size change in `InPlaceOnly`, or a count change without a known count byte.
 
 **Unknown item ids are kept.** Seven ids found by the strict layout are missing from `itemdb2.json`, yet all seven are in the character's own `player_knowledge`:
@@ -132,7 +132,7 @@ So the reference data is incomplete; the records are real. Requiring `isItem` he
   | backup-4 | 19 | – | 10 |
   | backups 5–9 | 14 | – | 5 |
 
-  In "Test Slots" (a character2 copy), the game showed a "Q" marker on Inventory slot 14, which is bit 16's value there. So these may be references to Inventory slots **[guess]**. Bit 16 cleared in the same 30 seconds as the shield and the hook came off, while slot 0 still held the bow. Re-equipping the hook and taking off seven armour and ring pieces left byte 2 unchanged. When the game sets or clears these bits is the open question for session B (docs/research/in-game-findings.md). Until then the mask, the u16 fields and the Equipped count are never changed.
+  In "Test Slots" (a character2 copy), the game showed a "Q" marker on Inventory slot 14, which is bit 16's value there. So these may be references to Inventory slots **[guess]**. Bit 16 cleared in the same 30 seconds as the shield and the hook came off, while slot 0 still held the bow. Re-equipping the hook and taking off seven armour and ring pieces left byte 2 unchanged. When the game sets or clears these bits is still open. Every capture (2026-10-27): byte 2 changed only in the autosave where the shield and hook came off, and numbers pointing at empty slots are common, so the editor's equip and unequip keep bits 16–18 and their u16s as read (docs/research/in-game-findings.md).
 - **Inventory header x:** `01` (character0, backups 5–9) or `02` (character1, character2, backups 0–4, all of Test Skills). It isn't n3, and it isn't the backpack: Tiny Backpack in backups 5–9 and Small elsewhere, yet character0 has a Small Backpack with x = 1. Unknown.
 - **Inventory slots: confirmed (session A).** 0–15 are backpack rows 1–2, 16–23 action bar row 1 (keys 1–8), 24–31 action bar row 2, and 32–39 backpack row 3. Extra 0… are the backpack-extension rows, 8 × the equipped backpack's rows (`InventoryLayout`).
 - **Tail** (22 bytes): meaning unknown. It is preserved, and its first four bytes anchor the parse.

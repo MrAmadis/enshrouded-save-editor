@@ -186,11 +186,36 @@ What this settles:
 - **Saving doesn't need Steam closed**, so the editor doesn't warn about Steam (main spec §10.2).
 - Not seen: the game using its own `remoteackup\` copies instead.
 
+## Equip and unequip — 2026-10-27
+
+"Equip Test", a Lab copy of Steam character1 (level 18, all 16 Equipped positions filled, byte 2: bit 16 = 0 the bow,
+bit 17 = 1 Copper Arrow ×88), in the local folder as `character4.ksd`, with `watch` capturing into
+`tests/fixtures/experiments/local-e/character4/`.
+
+| Capture | Written by | Equipped mask | Byte 2 |
+|---|---|---|---|
+| 09:29:08 (rev 18) | the Lab copy | `0003ffff`, all 16 | bit 16 = 0, bit 17 = 1 |
+| 09:30:26 (rev 19) | the editor: helmet and shield unequipped (to Extra 1–2) | `0003efdf` | unchanged |
+| 09:31:39 … 09:32:47 (rev 20–23) | the game, four saves | `0003efdf` | unchanged |
+| 09:33:07 (rev 24) | the editor: both equipped again | `0003ffff` | unchanged |
+| 09:34:03 (rev 25) | the game | `0003ffff` | unchanged |
+
+Owner: "all works". The two slots were empty in the game, the items in the backpack, and it held through an autosave and
+a reload; equipped again, both were worn.
+
+What this settles:
+- **The game accepts the editor's equip and unequip** with header byte 2 kept as read. It kept the editor's mask and
+  records through its own saves, and never changed byte 2, with the shield off or on.
+- **The 16 Equipped records after re-equipping are byte-identical** to the original's, and the game's next save kept
+  them so.
+- So the byte 2 change seen in session A (bit 16 cleared as the shield and hook came off in the game) wasn't the shield
+  coming off by itself; what the game uses those bits for is still unknown, and the editor still keeps them as read.
+
 ## Still open
 
 - ~~The in-game name box limit~~: 15 characters (owner, above).
 - **Upgrades on ranged items.** Ranged weapons in the owner's saves often have the rarity field's second byte set too: character1's Wolf's Snarl Longbow and Bronze Sword are level 23 with 5, on a level-18 character. So their level may include upgrades as well. The editor bounds a ranged item's level by its range, so one above its max level can only be lowered. Editing upgrades needs their rules first: the maximum, and how rarity changes with them.
-- **For session B: when the game sets or clears header byte 2 (Equipped mask bits 16–18).** Until this is answered, equipping into an empty Equipped position and unequipping stay disabled in the editor. Suggested checks, each on a local copy with `watch` running:
+- **For session B: when the game sets or clears header byte 2 (Equipped mask bits 16–18).** *(Equipping and unequipping no longer wait on this: the editor keeps byte 2 as read, and the game accepted that; "Equip and unequip", above.)* Suggested checks, each on a local copy with `watch` running:
   1. Take off **only the shield**, wait for an autosave, then put it back on. Does bit 16 clear and come back? With which u16 value?
   2. Without touching gear, change what the "Q" marker points at (or the ammo slot). Does bit 16's or bit 17's value change?
   3. Take off **only the backpack** (or another non-shield piece). Does byte 2 stay as it is?
