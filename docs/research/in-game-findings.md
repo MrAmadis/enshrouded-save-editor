@@ -163,11 +163,33 @@ as well.
 - Not checked: whether discovered places show under the fog (the copy's fog was cleared too; check 2), the ids in both
   registries apart (check 4), and discovery XP when a discovered place is visited (check 6).
 
+## Steam characters — 2026-10-27
+
+A game-made Steam throwaway: the owner created "Steam Test" in the game (Steam Cloud on; `remote\character3.ksd`, level 1),
+played it briefly and quit. Steam's catalogue (`remotecache.vdf`) then listed it with the file's exact SHA-1, so the
+cloud held that version. Each step below was checked by comparing the file's SHA-1 with the catalogue's (read only; the
+only writes to the Steam folder were the editor's Save changes and the game's own saves).
+
+1. **Saved with Steam open.** In the editor: name "Steam Edit", level 1 → 5, Copper Ore ×50 added; Save changes (revision
+   6; backup of the game's revision 5 kept). The catalogue didn't change until the game ran. Owner: when the game
+   launched, Steam uploaded the edited save; there was no conflict dialog, and the game showed every edit. On quit the
+   game saved revision 7, still with the edits, and the catalogue's SHA-1 matched it.
+2. **Saved with Steam closed.** Steam exited; in the editor: name "Steam Closed", level 6; Save changes (revision 8).
+   Owner: Steam synced when the game launched, no conflict dialog, and every edit was in the game. On quit the game saved
+   revision 9 with the edits; the catalogue's change number went from 52 to 54 (two uploads) and its SHA-1 matched the
+   file.
+
+What this settles:
+- **Steam Cloud keeps the editor's edits** to a Steam character, whether Steam is open or closed while the editor saves:
+  Steam sees the file changed since its last sync and uploads it when the game starts. Editing `remotecache.vdf` isn't
+  needed, and the editor doesn't.
+- **Saving doesn't need Steam closed**, so the editor doesn't warn about Steam (main spec §10.2).
+- Not seen: the game using its own `remoteackup\` copies instead.
+
 ## Still open
 
 - ~~The in-game name box limit~~: 15 characters (owner, above).
 - **Upgrades on ranged items.** Ranged weapons in the owner's saves often have the rarity field's second byte set too: character1's Wolf's Snarl Longbow and Bronze Sword are level 23 with 5, on a level-18 character. So their level may include upgrades as well. The editor bounds a ranged item's level by its range, so one above its max level can only be lowered. Editing upgrades needs their rules first: the maximum, and how rarity changes with them.
-- How the game accepts an edited **Steam** character, i.e. whether Steam Cloud keeps the edit. It can't be tested on a copy, because Steam never lists copies. It needs either the owner's own Save on a Steam character after the editor is finished, or a game-made Steam throwaway (owner to decide).
 - **For session B: when the game sets or clears header byte 2 (Equipped mask bits 16–18).** Until this is answered, equipping into an empty Equipped position and unequipping stay disabled in the editor. Suggested checks, each on a local copy with `watch` running:
   1. Take off **only the shield**, wait for an autosave, then put it back on. Does bit 16 clear and come back? With which u16 value?
   2. Without touching gear, change what the "Q" marker points at (or the ammo slot). Does bit 16's or bit 17's value change?
