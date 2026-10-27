@@ -19,9 +19,11 @@ public readonly record struct ItemRef(ContainerKind Kind, byte Slot);
 /// Equipped ones included.</item>
 /// <item>Adding, moving and removing need <see cref="InventoryStatus.Full"/>. New items go into the backpack
 /// (Inventory, or Extra within the equipped backpack's extension), never straight into Equipped.</item>
-/// <item>An item swaps with the Equipped item in a position it fits (<see cref="InventoryLayout.Fits"/>), which keeps
-/// the Equipped mask and record count (T12-R3). Equipping into an empty position and unequipping would change them,
-/// and when the game changes the header's byte 2 alongside isn't known, so they are refused.</item>
+/// <item>An item goes into an Equipped position it fits (<see cref="InventoryLayout.Fits"/>): it swaps with the item
+/// there (T12-R3), or fills the empty position. An Equipped item comes off into an empty or ghost slot
+/// (<see cref="Unequip"/> picks the first free one). The Equipped mask's bits 0–15 follow; header byte 2 and its u16
+/// fields stay as read, as the game left them while armour and rings came off (owner, 2026-10-27; in-game findings).
+/// Equipped items are never removed outright.</item>
 /// </list>
 /// </summary>
 public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
@@ -35,7 +37,7 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
     /// <summary>Why every inventory edit is refused when the inventory is <see cref="InventoryStatus.NotFound"/>.</summary>
     public const string Unread = "Inventory couldn't be read for this character.";
 
-    const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
+    const string RemoveEquipped = "Equipped items can't be removed: unequip it first.";
     const string EmptySlot = "There's no item in that slot.";
     const int BackpackPosition = 15;
 
@@ -98,11 +100,11 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         s.MarkChanged();
     }
 
-    /// <summary>Removes the record. <see cref="InventoryStatus.Full"/> only; never from Equipped (that unequips).</summary>
+    /// <summary>Removes the record. <see cref="InventoryStatus.Full"/> only; never from Equipped (<see cref="Unequip"/> first).</summary>
     public void Remove(ItemRef r)
     {
         EnsureFull();
-        if (r.Kind == ContainerKind.Equipped) throw new EditRejectedException(EquipLocked);
+        if (r.Kind == ContainerKind.Equipped) throw new EditRejectedException(RemoveEquipped);
         var rec = At(r) ?? throw new EditRejectedException(EmptySlot);
         s.Player.Container(r.Kind)!.Records.Remove(rec);
         s.MarkChanged();
@@ -110,8 +112,9 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
 
     /// <summary>
     /// Moves an item to another slot, swapping with the item there; a ghost in an Inventory or Extra target is
-    /// replaced. <see cref="InventoryStatus.Full"/> only. With Equipped on either side it must be a swap of items that
-    /// each fit their new position; a backpack swap must leave every Extra record inside the new backpack's extension.
+    /// replaced. <see cref="InventoryStatus.Full"/> only. With Equipped on either side, each item must fit the position it
+    /// goes into (<see cref="MoveEquipped"/>, <see cref="SwapEquipped"/>), and a backpack change must leave every Extra
+    /// record inside the extension of the backpack that ends up equipped.
     /// </summary>
     public void Move(ItemRef from, ItemRef to)
     {
@@ -120,7 +123,8 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         if (from == to) throw new EditRejectedException("The item is already in that slot.");
         if (from.Kind == ContainerKind.Equipped || to.Kind == ContainerKind.Equipped)
         {
-            SwapEquipped(from, to, src);
+            if (At(to) is { } other) SwapEquipped(from, to, src, other);
+            else MoveEquipped(from, to, src);
             return;
         }
 
@@ -168,7 +172,7 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         }
         else
         {
-            at = FirstFree() ?? throw new EditRejectedException(NoRoom);
+            at = FirstFree(ExtraCapacity) ?? throw new EditRejectedException(NoRoom);
         }
 
         var list = s.Player.Container(at.Kind)!.Records;
@@ -184,23 +188,85 @@ public sealed class InventoryEditor(SaveSession s, IItemCatalog items)
         return at;
     }
 
-    /// <summary>The first empty or ghost slot of the backpack grid (<see cref="InventoryLayout.BackpackGrid"/>).</summary>
-    ItemRef? FirstFree()
+    /// <summary>
+    /// Takes an equipped item off into the first free slot of the backpack grid (<see cref="FirstFree"/>; the base rows
+    /// only for the backpack itself, whose extension goes with it) and returns that slot. <see cref="InventoryStatus.Full"/> only.
+    /// </summary>
+    public ItemRef Unequip(ItemRef r)
     {
-        foreach (var r in InventoryLayout.BackpackGrid(ExtraCapacity))
+        EnsureFull();
+        if (r.Kind != ContainerKind.Equipped) throw new EditRejectedException("Only equipped items can be unequipped.");
+        var src = At(r) ?? throw new EditRejectedException(EmptySlot);
+        var to = FirstFree(r.Slot == BackpackPosition ? 0 : ExtraCapacity) ?? throw new EditRejectedException(NoRoom);
+        MoveEquipped(r, to, src);
+        return to;
+    }
+
+    /// <summary>The first empty or ghost slot of the backpack grid with <paramref name="extraCapacity"/> extension slots.</summary>
+    ItemRef? FirstFree(int extraCapacity)
+    {
+        foreach (var r in InventoryLayout.BackpackGrid(extraCapacity))
             if (At(r) is null) return r;
         return null;
     }
 
     /// <summary>
-    /// T12-R3: swaps <paramref name="src"/> with the item in <paramref name="to"/>, one side or both in Equipped. The
-    /// Equipped records keep their count, their mask-bit order and slot bytes 0…n−1: the incoming item takes the
-    /// outgoing one's place in the list.
+    /// Puts <paramref name="src"/> into an empty Equipped position it fits, takes it off into an empty or ghost slot (the
+    /// ghost is replaced), or moves it to another empty position (<see cref="PlayerCharacter.Equip"/>,
+    /// <see cref="PlayerCharacter.Unequip"/>). A backpack coming off takes its extension with it, so no record (ghosts too)
+    /// may be left there; one going on gives its own, which the Extra records must fit.
     /// </summary>
-    void SwapEquipped(ItemRef from, ItemRef to, ItemRecord src)
+    void MoveEquipped(ItemRef from, ItemRef to, ItemRecord src)
     {
-        // An empty or ghost target means equipping into an empty position or unequipping: both change the mask.
-        var dst = At(to) ?? throw new EditRejectedException(EquipLocked);
+        if (to.Kind == ContainerKind.Equipped)
+        {
+            EnsureFits(src, to.Slot);
+            if (Find(to) is not null) throw new EditRejectedException("That slot is taken.");   // a ghost the editor leaves alone
+        }
+        else EnsureSlotExists(to);
+
+        var extra = s.Player.Container(ContainerKind.Extra)!.Records;
+        if (from is { Kind: ContainerKind.Equipped, Slot: BackpackPosition } && to.Kind != ContainerKind.Equipped)
+        {
+            var taken = $"Taking off {NameOf(src)} removes its {ExtraCapacity} backpack extension slots";
+            if (to.Kind == ContainerKind.Extra) throw new EditRejectedException($"{taken}: it can't go into one of them.");
+            if (extra.Count > 0) throw new EditRejectedException($"{taken}: move the items out of them first.");
+        }
+        if (to is { Kind: ContainerKind.Equipped, Slot: BackpackPosition })
+        {
+            var cap = CapacityFor(src);
+            if (extra.Any(r => r != src && r.Slot >= cap))
+                throw new EditRejectedException($"{NameOf(src)} gives {cap} backpack extension slots: move the items out of the others first.");
+        }
+
+        var ghost = to.Kind == ContainerKind.Equipped ? null : Find(to);
+        var dstList = to.Kind == ContainerKind.Equipped ? null : s.Player.Container(to.Kind)!.Records;
+        if (dstList is not null && ghost is null) EnsureRoom(dstList);
+
+        ItemRecord rec;
+        if (from.Kind == ContainerKind.Equipped) rec = s.Player.Unequip(from.Slot);
+        else
+        {
+            s.Player.Container(from.Kind)!.Records.Remove(src);
+            rec = src;
+        }
+        if (dstList is null) s.Player.Equip(to.Slot, rec);
+        else
+        {
+            if (ghost is not null) dstList.Remove(ghost);
+            rec.Slot = to.Slot;
+            Insert(dstList, rec);
+        }
+        s.MarkChanged();
+    }
+
+    /// <summary>
+    /// T12-R3: swaps <paramref name="src"/> with <paramref name="dst"/>, the item in <paramref name="to"/>, one side or
+    /// both in Equipped. The Equipped records keep their count, their mask-bit order and slot bytes 0…n−1: the incoming
+    /// item takes the outgoing one's place in the list.
+    /// </summary>
+    void SwapEquipped(ItemRef from, ItemRef to, ItemRecord src, ItemRecord dst)
+    {
         if (to.Kind == ContainerKind.Equipped) EnsureFits(src, to.Slot);
         if (from.Kind == ContainerKind.Equipped) EnsureFits(dst, from.Slot);
         if (from.Kind != ContainerKind.Equipped) EnsureSlotExists(from);

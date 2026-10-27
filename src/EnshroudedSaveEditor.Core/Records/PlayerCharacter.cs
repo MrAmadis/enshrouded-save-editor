@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.Numerics;
 using EnshroudedSaveEditor.Core.Container;
 
 namespace EnshroudedSaveEditor.Core.Records;
@@ -22,6 +23,8 @@ public sealed class PlayerCharacter
 
     readonly byte[] _prefix;
     readonly IReadOnlyList<TailPart> _tail;
+    readonly MaskPart? _mask;
+    readonly uint? _readMask;
 
     public uint Level { get; set; }
     public uint Xp { get; set; }
@@ -36,24 +39,70 @@ public sealed class PlayerCharacter
 
     /// <summary>
     /// The Equipped header's u32 field mask: bits 0–15 are the Equipped positions that hold a record, bits 16–18 the
-    /// u16 fields after the records (meaning unknown, kept as read). Null when it wasn't located. It is read only:
-    /// the Equipped record count can't change.
+    /// u16 fields after the records (meaning unknown, kept as read). Null when it wasn't located. Bits 0–15 change only
+    /// through <see cref="Equip"/> and <see cref="Unequip"/>.
     /// </summary>
-    public uint? EquippedMask { get; }
+    public uint? EquippedMask => _mask?.Mask ?? _readMask;
 
     /// <summary>
     /// The Equipped position (0–15, the mask's set bits in order) of each Equipped record, by record index; null when
     /// the mask wasn't located.
     /// </summary>
-    public IReadOnlyList<int>? EquippedPositions { get; }
+    public IReadOnlyList<int>? EquippedPositions =>
+        EquippedMask is { } mask ? Enumerable.Range(0, 16).Where(bit => (mask >> bit & 1) != 0).ToArray() : null;
 
     PlayerCharacter(byte[] prefix, uint level, uint xp, List<SkillEntry> skills, InventoryScan inventory)
     {
         _prefix = prefix; Level = level; Xp = xp; Skills = skills;
         InventoryStatus = inventory.Status; Containers = inventory.Containers; _tail = inventory.Parts;
-        EquippedMask = inventory.EquippedMask;
-        if (inventory.EquippedMask is { } mask)
-            EquippedPositions = Enumerable.Range(0, 16).Where(bit => (mask >> bit & 1) != 0).ToArray();
+        _mask = inventory.Parts.OfType<MaskPart>().SingleOrDefault();
+        _readMask = inventory.EquippedMask;
+    }
+
+    /// <summary>
+    /// Puts <paramref name="record"/> in the empty Equipped <paramref name="position"/> (0–15): it takes its place among
+    /// the records in mask-bit order, the slot bytes become 0…n−1 again, and the mask gains the position's bit. Bits
+    /// 16–18 and their u16 fields stay as read. Only the strict layout writes the mask back, so any other throws
+    /// <see cref="InvalidOperationException"/>, as does a taken position.
+    /// </summary>
+    public void Equip(int position, ItemRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        var mask = EquippedMaskPart(position);
+        if ((mask.Mask >> position & 1) != 0) throw new InvalidOperationException($"Equipped position {position} is taken.");
+        mask.Equipped.Records.Insert(BitOperations.PopCount(mask.Mask & ((1u << position) - 1)), record);
+        mask.Mask |= 1u << position;
+        Renumber(mask.Equipped.Records);
+    }
+
+    /// <summary>
+    /// Takes the record out of Equipped <paramref name="position"/> (0–15) and returns it: the mask loses the position's
+    /// bit and the slot bytes become 0…n−1 again (the returned record keeps its old one). Throws
+    /// <see cref="InvalidOperationException"/> for an empty position or a layout other than the strict one.
+    /// </summary>
+    public ItemRecord Unequip(int position)
+    {
+        var mask = EquippedMaskPart(position);
+        if ((mask.Mask >> position & 1) == 0) throw new InvalidOperationException($"Equipped position {position} is empty.");
+        var records = mask.Equipped.Records;
+        var i = BitOperations.PopCount(mask.Mask & ((1u << position) - 1));
+        var record = records[i];
+        records.RemoveAt(i);
+        mask.Mask &= ~(1u << position);
+        Renumber(records);
+        return record;
+    }
+
+    MaskPart EquippedMaskPart(int position)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(position);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(position, 15);
+        return _mask ?? throw new InvalidOperationException("Equipped records can't be added or removed in this save.");
+    }
+
+    static void Renumber(List<ItemRecord> records)
+    {
+        for (var i = 0; i < records.Count; i++) records[i].Slot = (byte)i;
     }
 
     /// <summary>
@@ -94,7 +143,8 @@ public sealed class PlayerCharacter
     /// <summary>
     /// Writes the record, re-encoding item records where they were found. Throws
     /// <see cref="InvalidOperationException"/> for a change the located layout can't express: a record
-    /// count change without a known count byte (Equipped, or any list when not <see cref="InventoryStatus.Full"/>),
+    /// count change without a known count byte (any list when not <see cref="InventoryStatus.Full"/>), Equipped records
+    /// that the mask's bits 0–15 don't count,
     /// a size change in an in-place layout, slots out of order, an Equipped slot byte that isn't its record index
     /// (<see cref="InventoryStatus.Full"/>), or a record the reader would reject.
     /// </summary>
@@ -125,6 +175,10 @@ public sealed class PlayerCharacter
         {
             case OpaquePart p:
                 return p.Bytes.Length;
+            case MaskPart m:
+                if (BitOperations.PopCount(m.Mask & 0xFFFF) != m.Equipped.Records.Count)
+                    throw new InvalidOperationException("Equipped records can't be added or removed without their positions.");
+                return 4;
             case CountPart c:
                 if (c.Container.Records.Count > byte.MaxValue)
                     throw new InvalidOperationException($"{c.Container.Kind} holds more than {byte.MaxValue} records.");
@@ -160,6 +214,9 @@ public sealed class PlayerCharacter
             case OpaquePart p:
                 p.Bytes.CopyTo(o);
                 return p.Bytes.Length;
+            case MaskPart m:
+                BinaryPrimitives.WriteUInt32LittleEndian(o, m.Mask);
+                return 4;
             case CountPart c:
                 o[0] = (byte)c.Container.Records.Count;
                 return 1;

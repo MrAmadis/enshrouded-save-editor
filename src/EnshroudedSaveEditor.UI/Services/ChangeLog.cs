@@ -46,6 +46,10 @@ public sealed class ChangeLog
 
     public static string Moved(string item) => $"Moved {item}";
 
+    public static string Equipped(string item) => $"Equipped {item}";
+
+    public static string Unequipped(string item) => $"Unequipped {item}";
+
     public static string Swapped(string item, string other) => $"Swapped {item} and {other}";
 
     /// <summary>"Learned Blink", or "Learned Blink (rank 2)" for a rank-up.</summary>

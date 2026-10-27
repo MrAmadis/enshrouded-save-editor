@@ -20,7 +20,6 @@ public sealed class InventoryTabTests : IDisposable
     const uint RingOfHealth = 0xf29b7aa9;         // Equipment/Ring
     const uint LesserRingOfHealth = 0x3993797a;   // character2 Equipped position 10
     const uint AlchemistHat = 0xe5a9ac59;         // character2 Equipped position 5
-    const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
     const string FitModule = "./_content/EnshroudedSaveEditor.UI/fit.js";
 
     readonly string _root = Fixtures.CopyToTemp();
@@ -357,8 +356,31 @@ public sealed class InventoryTabTests : IDisposable
         Assert.Equal("Equipped · Ring", cut.Find(".detail .where").TextContent.Trim());
     }
 
+    // Owner, 2026-10-27: dragging gear into a free slot takes it off, and into an empty position it fits puts it on.
     [Fact]
-    public void Dropping_into_an_empty_equipped_position_shows_the_refusal()
+    public void Dragging_gear_off_and_back_on()
+    {
+        var editor = Start();
+        var cut = _ctx.Render<InventoryTab>();
+
+        cut.Find(Slot(Eq(5))).DragStart();
+        cut.Find(Slot(Inv(0))).Drop();
+
+        Assert.Null(editor.Current.Equipped[5].Item);
+        Assert.Equal(AlchemistHat, ItemAt(editor.Current, Inv(0))!.Id);
+        Assert.Equal("Unequipped Alchemist Apprentice Hat", editor.Current.Pending[^1]);
+        Assert.Contains("sel", cut.Find(Slot(Inv(0))).ClassList);
+
+        cut.Find(Slot(Inv(0))).DragStart();
+        cut.Find(Slot(Eq(5))).Drop();
+
+        Assert.Equal(AlchemistHat, editor.Current.Equipped[5].Item!.Id);
+        Assert.Equal("Equipped Alchemist Apprentice Hat", editor.Current.Pending[^1]);
+        Assert.Empty(cut.FindAll(".banner"));
+    }
+
+    [Fact]
+    public void Dropping_what_does_not_fit_an_empty_position_shows_why()
     {
         var editor = Start();
         var cut = _ctx.Render<InventoryTab>();
@@ -366,18 +388,24 @@ public sealed class InventoryTabTests : IDisposable
         cut.Find(Slot(Inv(30))).DragStart();
         cut.Find(Slot(Eq(0))).Drop();
 
-        Assert.Equal(EquipLocked, cut.Find(".banner").TextContent.Trim());
+        Assert.Contains("doesn't go in", cut.Find(".banner").TextContent);
         Assert.Empty(editor.Current.Pending);
         Assert.Equal("Fireball I", ItemAt(editor.Current, Inv(30))!.Name);
+    }
 
-        cut.Find(Slot(Eq(5))).DragStart();                                  // unequipping into a free slot: refused too
-        cut.Find(Slot(Inv(0))).Drop();
-        Assert.Equal(EquipLocked, cut.Find(".banner").TextContent.Trim());
-        Assert.Empty(editor.Current.Pending);
+    [Fact]
+    public void The_selected_equipped_item_can_be_unequipped()
+    {
+        var editor = Start();
+        var cut = _ctx.Render<InventoryTab>();
+        cut.Find(Slot(Eq(5))).Click();
 
-        cut.Find(Slot(Inv(30))).DragStart();                                // a good edit clears the message
-        cut.Find(Slot(Inv(0))).Drop();
-        Assert.Empty(cut.FindAll(".banner"));
+        cut.Find("button.unequip").Click();
+
+        Assert.Null(editor.Current.Equipped[5].Item);
+        Assert.Equal(AlchemistHat, ItemAt(editor.Current, Inv(0))!.Id);
+        Assert.Contains("sel", cut.Find(Slot(Inv(0))).ClassList);          // the selection follows the item
+        Assert.Empty(cut.FindAll("button.unequip"));                         // it's in the backpack now
     }
 
     [Fact]

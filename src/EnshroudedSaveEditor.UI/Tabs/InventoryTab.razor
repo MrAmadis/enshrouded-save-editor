@@ -164,7 +164,7 @@ else
                     }
                     @if (sel.Ref.Kind == ContainerKind.Equipped)
                     {
-                        <p class="note">To take it off, drag an item that fits onto it: the two swap places.</p>
+                        <button class="btn unequip" disabled="@(!canMove)" title="@moveOff" @onclick="() => Unequip(sel.Ref)">Unequip</button>
                     }
                     else
                     {
@@ -175,7 +175,7 @@ else
             else
             {
                 <div class="ph"><h4>Selected</h4></div>
-                <p class="muted">Select an item to change it. Drag a stack to move it; drop an item on an equipped one it fits to swap them.</p>
+                <p class="muted">Select an item to change it. Drag a stack to move it; drag gear onto an equipped slot it fits to wear it.</p>
             }
         </aside>
     </div>
@@ -303,6 +303,18 @@ else
         if (from is not { } f || f == to)
             return;
         if (Try(() => EditorService.MoveItem(f, to)))
+            _selected = to;
+    }
+
+    /// <summary>The item goes to the first free backpack slot and stays selected there.</summary>
+    private void Unequip(ItemRef r)
+    {
+        ItemRef to = default;
+        if (Try(() =>
+        {
+            (var view, to) = EditorService.Unequip(r);
+            return view;
+        }))
             _selected = to;
     }
 

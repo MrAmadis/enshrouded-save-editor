@@ -248,6 +248,29 @@ public sealed class EditorServiceTests : IDisposable
         Assert.Empty(e.Current.Pending);
     }
 
+    // Owner, 2026-10-27: gear goes on into an empty position and comes off into a free slot.
+    [Fact]
+    public void Equip_and_unequip_are_edits_with_their_own_lines()
+    {
+        var e = Start();
+        e.Open(C(2));
+
+        var off = e.MoveItem(Eq(5), Inv(35));
+        Assert.Null(off.Equipped[5].Item);
+        Assert.Equal(AlchemistHat, ItemAt(off, Inv(35)).Id);
+        Assert.Equal(["Unequipped Alchemist Apprentice Hat"], off.Pending);
+
+        var on = e.MoveItem(Inv(35), Eq(5));
+        Assert.Equal(AlchemistHat, on.Equipped[5].Item!.Id);
+        Assert.Equal("Equipped Alchemist Apprentice Hat", on.Pending[^1]);
+
+        var (view, to) = e.Unequip(Eq(5));
+        Assert.Equal(Inv(0), to);
+        Assert.Equal(AlchemistHat, ItemAt(view, Inv(0)).Id);
+        Assert.Equal("Unequipped Alchemist Apprentice Hat", view.Pending[^1]);
+        Assert.Equal(AlchemistHat, e.Undo().Equipped[5].Item!.Id);
+    }
+
     [Fact]
     public void Undo_keeps_the_last_50_edits()
     {

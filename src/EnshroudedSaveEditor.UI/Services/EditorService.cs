@@ -350,15 +350,36 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         return ChangeLog.Removed(ItemName(rec!.ItemId), rec.Count);
     });
 
-    /// <summary>Moves an item, swapping with the one in <paramref name="to"/>; Equipped allows swaps only.</summary>
+    /// <summary>
+    /// Moves an item, swapping with the one in <paramref name="to"/>: into an empty Equipped position it equips the item,
+    /// and out of one into a free slot it unequips it (<see cref="InventoryEditor.Move"/>).
+    /// </summary>
     public SessionView MoveItem(ItemRef from, ItemRef to) => Edit(s =>
     {
         var inventory = Inventory(s);
         var item = inventory.At(from);
         var other = inventory.At(to);
         inventory.Move(from, to);
-        return other is null ? ChangeLog.Moved(ItemName(item!.ItemId)) : ChangeLog.Swapped(ItemName(item!.ItemId), ItemName(other.ItemId));
+        var name = ItemName(item!.ItemId);
+        return other is not null ? ChangeLog.Swapped(name, ItemName(other.ItemId))
+            : to.Kind == ContainerKind.Equipped ? ChangeLog.Equipped(name)
+            : from.Kind == ContainerKind.Equipped ? ChangeLog.Unequipped(name)
+            : ChangeLog.Moved(name);
     });
+
+    /// <summary>Takes an equipped item off into the first free backpack slot, and returns where it went so it stays selected.</summary>
+    public (SessionView View, ItemRef To) Unequip(ItemRef r)
+    {
+        ItemRef to = default;
+        var view = Edit(s =>
+        {
+            var inventory = Inventory(s);
+            var item = inventory.At(r);
+            to = inventory.Unequip(r);
+            return ChangeLog.Unequipped(ItemName(item!.ItemId));
+        });
+        return (view, to);
+    }
 
     /// <summary>
     /// Adds a stack to <paramref name="target"/>, or else to the first free backpack slot, and returns where it went so

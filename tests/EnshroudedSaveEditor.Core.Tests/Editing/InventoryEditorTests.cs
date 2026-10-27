@@ -39,7 +39,7 @@ public class InventoryEditorTests : IDisposable
     const uint GemOfStormsEye = 0xe52a5ac0;     // WeaponGem, levels 1–105 in the data; character1 Inventory 7, level 16
 
     const string NeedsFull = "Adding and moving items isn't available for this character yet";
-    const string EquipLocked = "Equipping into an empty slot and unequipping aren't available yet: swap with an item that fits instead";
+    const uint BlacksmithHat = 0xc52f14b3;      // fits position 0 (helmet appearance)
 
     readonly string _tmp = Fixtures.CopyToTemp();
     readonly string _backupRoot = Path.Combine(Path.GetTempPath(), "enshrouded-backups-" + Guid.NewGuid().ToString("N"));
@@ -539,43 +539,144 @@ public class InventoryEditorTests : IDisposable
         Assert.Equal(0, s1.ChangeCount);
     }
 
-    // T12-R3: these change the Equipped mask and record count, and when the game changes header byte 2 alongside
-    // isn't known (docs/research/in-game-findings.md), so they stay disabled.
+    // Owner, 2026-10-27: equipping into an empty position and unequipping are on. They rewrite the Equipped mask's bits
+    // 0–15; header byte 2 and its u16s stay as read (the game left them alone as armour and rings came off, in-game findings).
     [Fact]
-    public void Equipping_into_an_empty_position_and_unequipping_stay_locked()
+    public void Gear_comes_off_into_an_empty_slot_and_goes_back_on()
+    {
+        var s = Open(); var e = Ed(s);
+        var before = s.Player.ToBytes();
+
+        e.Move(Eq(5), Inv(35));
+
+        Assert.Null(e.At(Eq(5)));
+        Assert.Equal(AlchemistHat, e.At(Inv(35))!.ItemId);
+        Assert.Equal(0x0005ffc0u, s.Player.EquippedMask);
+        e.Move(Inv(35), Eq(5));
+        Assert.Equal(before, s.Player.ToBytes());
+        Assert.Equal(2, s.ChangeCount);
+    }
+
+    [Fact]
+    public void Gear_coming_off_onto_a_ghost_replaces_it()
+    {
+        var s = Open(); var e = Ed(s);
+        Assert.True(Records(s.Player, ContainerKind.Inventory).Single(r => r.Slot == 15).IsGhost);   // Bronze Sword ×0
+
+        e.Move(Eq(5), Inv(15));
+
+        Assert.Equal(AlchemistHat, Records(s.Player, ContainerKind.Inventory).Single(r => r.Slot == 15).ItemId);
+        Assert.Equal(21, Records(s.Player, ContainerKind.Inventory).Count);
+    }
+
+    [Fact]
+    public void Gear_goes_into_an_empty_position_it_fits_and_is_saved()
     {
         var s = Open(); var e = Ed(s);                             // positions 0–4 are empty
-        var vanity = e.Add(Item(0xc52f14b3), 1, null, null, null); // Blacksmith Hat: fits position 0
+        var hat = e.Add(Item(BlacksmithHat), 1, null, null, null);
+        Assert.Contains("doesn't go in", Rejected(() => e.Move(hat, Eq(1))).Message);
+        Assert.Contains("doesn't go in", Rejected(() => e.Move(Inv(30), Eq(0))).Message);   // Fireball I
+
+        e.Move(hat, Eq(0));
+
+        Assert.Equal(BlacksmithHat, e.At(Eq(0))!.ItemId);
+        Assert.Null(e.At(hat));
+        Assert.Equal(SaveResult.Saved, s.Save(new BackupService(_backupRoot), new FakeProbe()));
+        var re = Open();
+        Assert.Equal((InventoryStatus.Full, 0x0005ffe1u), (re.Player.InventoryStatus, re.Player.EquippedMask));
+        Assert.Equal(BlacksmithHat, Ed(re).At(Eq(0))!.ItemId);
+    }
+
+    [Fact]
+    public void Gear_moves_to_an_empty_position_it_fits()
+    {
+        var s = Open(); var e = Ed(s);
+        var ring = e.At(Eq(10))!.ItemId;
+        e.Move(Eq(11), Inv(35));
+
+        e.Move(Eq(10), Eq(11));
+
+        Assert.Null(e.At(Eq(10)));
+        Assert.Equal(ring, e.At(Eq(11))!.ItemId);
+        Assert.Contains("doesn't go in", Rejected(() => e.Move(Eq(11), Eq(0))).Message);
+    }
+
+    [Fact]
+    public void Unequip_takes_gear_to_the_first_free_backpack_slot()
+    {
+        var s = Open(); var e = Ed(s);
+
+        Assert.Equal(Inv(0), e.Unequip(Eq(5)));                   // Inventory 0 is the first free slot
+
+        Assert.Equal(AlchemistHat, e.At(Inv(0))!.ItemId);
+        Assert.Null(e.At(Eq(5)));
+        Assert.Equal("There's no item in that slot.", Rejected(() => e.Unequip(Eq(0))).Message);
+        Assert.Equal("Only equipped items can be unequipped.", Rejected(() => e.Unequip(Inv(0))).Message);
+    }
+
+    [Fact]
+    public void Unequip_needs_room_in_the_backpack()
+    {
+        var s = Open(); var e = Ed(s);
+        while (true)
+            try { e.Add(Item(CopperOre), 1, null, null, null); }
+            catch (EditRejectedException) { break; }
         var before = s.Player.ToBytes();
-        foreach (var edit in new Action[]
-        {
-            () => e.Move(vanity, Eq(0)),                           // into an empty position
-            () => e.Move(Eq(5), Inv(35)),                          // out to an empty slot
-            () => e.Move(Eq(5), Inv(15)),                          // … or onto a ghost
-            () => e.Move(Eq(10), Extra(0)),
-            () => e.Remove(Eq(5)),
-        })
-            Assert.Equal(EquipLocked, Rejected(edit).Message);
-        Assert.Equal("New items go into the backpack.", Rejected(() => e.Add(Item(RingOfHealth), 1, null, null, Eq(11))).Message);
-        Assert.Equal(1, s.ChangeCount);
+
+        Assert.Equal(InventoryEditor.NoRoom, Rejected(() => e.Unequip(Eq(5))).Message);
         Assert.Equal(before, s.Player.ToBytes());
     }
 
-    // The "Test Skills" autosave with gear positions 5–12 empty (git-ignored capture; skipped when missing).
+    // The backpack's extension goes with it: it comes off only when no record (ghosts too) is left in the extension.
     [Fact]
-    public void Gear_cannot_go_into_an_emptied_position()
+    public void The_backpack_comes_off_only_with_an_empty_extension()
+    {
+        var s = Open(); var e = Ed(s);                             // Small Backpack _NEW, 16 extension slots, none used
+        var name = Item(SmallBackpackNew).Name;
+        var ore = e.Add(Item(CopperOre), 3, null, null, Extra(2));
+        var before = s.Player.ToBytes();
+        var full = $"Taking off {name} removes its 16 backpack extension slots: move the items out of them first.";
+        Assert.Equal(full, Rejected(() => e.Move(Eq(15), Inv(35))).Message);
+        Assert.Equal(full, Rejected(() => e.Unequip(Eq(15))).Message);
+        Assert.Equal(before, s.Player.ToBytes());
+
+        e.Remove(ore);
+        Assert.Equal($"Taking off {name} removes its 16 backpack extension slots: it can't go into one of them.",
+            Rejected(() => e.Move(Eq(15), Extra(5))).Message);
+        e.Move(Eq(15), Inv(35));
+        Assert.Equal(0, e.ExtraCapacity);
+        e.Move(Inv(35), Eq(15));
+        Assert.Equal(16, e.ExtraCapacity);
+    }
+
+    [Fact]
+    public void Equipped_items_still_cannot_be_removed_or_added()
+    {
+        var s = Open(); var e = Ed(s);
+        Assert.Equal("Equipped items can't be removed: unequip it first.", Rejected(() => e.Remove(Eq(5))).Message);
+        Assert.Equal("New items go into the backpack.", Rejected(() => e.Add(Item(RingOfHealth), 1, null, null, Eq(0))).Message);
+        Assert.Equal(0, s.ChangeCount);
+    }
+
+    // The "Test Skills" autosave with gear positions 5–12 empty (git-ignored capture; skipped when missing): the game's
+    // own emptied positions take gear back, and byte 2 stays as the game wrote it.
+    [Fact]
+    public void Gear_goes_back_into_a_position_the_game_emptied()
     {
         var path = Path.Combine(_tmp, "capture.ksd");
         File.WriteAllBytes(path, Fixtures.ReadCapture("local/character5/20261025-141219.ksd"));
         var s = SaveSession.Open(path, IsItem); var e = Ed(s);
-        Assert.Equal(InventoryStatus.Full, s.Player.InventoryStatus);
-        Assert.Null(e.At(Eq(5)));
+        Assert.Equal((InventoryStatus.Full, 0x0002e01fu), (s.Player.InventoryStatus, s.Player.EquippedMask));
         var helmet = Records(s.Player, ContainerKind.Inventory).Concat(Records(s.Player, ContainerKind.Extra))
             .Single(r => r.ItemId == AdventurerHelmet);
         var kind = Records(s.Player, ContainerKind.Inventory).Contains(helmet) ? ContainerKind.Inventory : ContainerKind.Extra;
-        Assert.Equal(EquipLocked, Rejected(() => e.Move(new ItemRef(kind, helmet.Slot), Eq(5))).Message);
-        Assert.Equal(EquipLocked, Rejected(() => e.Move(Eq(13), Extra(10))).Message);
-        Assert.Equal(0, s.ChangeCount);
+
+        e.Move(new ItemRef(kind, helmet.Slot), Eq(5));
+
+        Assert.Equal(0x0002e03fu, s.Player.EquippedMask);
+        Assert.Equal(AdventurerHelmet, e.At(Eq(5))!.ItemId);
+        Assert.Equal(SaveResult.Saved, s.Save(new BackupService(_backupRoot), new FakeProbe()));
+        Assert.Equal(0x0002e03fu, SaveSession.Open(path, IsItem).Player.EquippedMask);
     }
 
     // The extension shrinks with a smaller backpack, so a swap may not leave items past the new capacity.

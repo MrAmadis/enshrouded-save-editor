@@ -266,6 +266,84 @@ public class InventoryTests
         Assert.Equal((byte)0x10, re.Container(ContainerKind.Inventory)!.Records.Single(r => r.Slot == 30).Flags);
     }
 
+    // Equip and unequip rewrite the mask's bits 0–15 and the Equipped records (in mask-bit order, slot bytes 0…n−1);
+    // header byte 2 (bits 16–18) and its u16s stay as read.
+    [Fact]
+    public void Unequip_clears_the_position_and_keeps_header_byte_2()
+    {
+        var pc = Load("character1.ksd");
+
+        var shield = pc.Unequip(12);
+
+        Assert.Equal(0x0262764au, shield.ItemId);                  // Hero's Shield
+        Assert.Equal(0x0003efffu, pc.EquippedMask);
+        Assert.Equal(Enumerable.Range(0, 15), pc.Container(ContainerKind.Equipped)!.Records.Select(r => (int)r.Slot));
+        var bytes = pc.ToBytes();
+        var back = PlayerCharacter.Parse(bytes, IsItem);
+        Assert.Equal(InventoryStatus.Full, back.InventoryStatus);
+        Assert.Equal(0x0003efffu, back.EquippedMask);
+        Assert.DoesNotContain(12, back.EquippedPositions!);
+        var end = EquippedEnd(back, 57);
+        Assert.Equal(new byte[] { 0x00, 0x00, 0x01, 0x00, 0x05 }, bytes[end..(end + 5)]);   // bit 16: 0, bit 17: 1, as read
+        Assert.Equal(38, back.Container(ContainerKind.Inventory)!.Records.Count);
+    }
+
+    [Fact]
+    public void Equipping_what_came_off_gives_back_the_same_bytes()
+    {
+        var raw = Raw("character1.ksd");
+        var pc = PlayerCharacter.Parse(raw, IsItem);
+
+        pc.Equip(12, pc.Unequip(12));
+        pc.Equip(5, pc.Unequip(5));
+
+        Assert.Equal(raw, pc.ToBytes());
+    }
+
+    // character2's positions 0–4 (appearance) are empty: a record equipped there goes first.
+    [Fact]
+    public void Equip_into_an_empty_position_takes_its_place_in_mask_order()
+    {
+        var pc = Load("character2.ksd");
+        var inventory = pc.Container(ContainerKind.Inventory)!.Records;
+        var wand = inventory.Single(r => r.ItemId == 0xe589d7a4u);   // Scorching Wand: the record layer doesn't check fit
+        inventory.Remove(wand);
+
+        pc.Equip(0, wand);
+
+        Assert.Equal(0x0005ffe1u, pc.EquippedMask);
+        var eq = pc.Container(ContainerKind.Equipped)!.Records;
+        Assert.Same(wand, eq[0]);
+        Assert.Equal(Enumerable.Range(0, 12), eq.Select(r => (int)r.Slot));
+        var bytes = pc.ToBytes();
+        var back = PlayerCharacter.Parse(bytes, IsItem);
+        Assert.Equal((InventoryStatus.Full, 0x0005ffe1u), (back.InventoryStatus, back.EquippedMask));
+        var header = bytes.AsSpan().IndexOf(new byte[] { 0xe1, 0xff, 0x05, 0x00 });
+        var end = header + 4 + eq.Sum(r => r.EncodedLength);
+        Assert.Equal(new byte[] { 0x0e, 0x00, 0x0f, 0x00, 0x05 }, bytes[end..(end + 5)]);   // bit 16: 14, bit 18: 15, as read
+    }
+
+    [Fact]
+    public void Equip_and_unequip_need_a_free_or_taken_position()
+    {
+        var pc = Load("character2.ksd");
+        var wand = pc.Container(ContainerKind.Inventory)!.Records.Single(r => r.ItemId == 0xe589d7a4u);
+        Assert.Throws<InvalidOperationException>(() => pc.Unequip(0));        // empty
+        Assert.Throws<InvalidOperationException>(() => pc.Equip(5, wand));    // taken
+        Assert.Throws<ArgumentOutOfRangeException>(() => pc.Unequip(16));
+        Assert.Throws<ArgumentOutOfRangeException>(() => pc.Equip(-1, wand));
+        Assert.Equal(Raw("character2.ksd"), pc.ToBytes());
+    }
+
+    // Without the strict layout the mask isn't written back, so the Equipped records can't change.
+    [Fact]
+    public void Equip_and_unequip_need_the_strict_layout()
+    {
+        var pc = PlayerCharacter.Parse(KsdFile.Parse(Fixtures.InPlaceOnlyCharacter2())["player_character"].GetData(), IsItem);
+        Assert.Equal(InventoryStatus.InPlaceOnly, pc.InventoryStatus);
+        Assert.Throws<InvalidOperationException>(() => pc.Unequip(5));
+    }
+
     [Fact]
     public void Equipped_record_count_cannot_change()
     {

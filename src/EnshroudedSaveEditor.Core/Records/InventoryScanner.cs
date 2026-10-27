@@ -35,6 +35,15 @@ internal sealed record CountPart(ItemContainer Container) : TailPart;
 /// </summary>
 internal sealed record RecordsPart(ItemContainer Container, int? FixedCount, int[]? FixedLengths, bool IndexedSlots = false) : TailPart;
 
+/// <summary>
+/// The Equipped header's u32 field mask, written from <see cref="Mask"/>. Its bits 0–15 must count the
+/// <see cref="Equipped"/> records; bits 16–18 (header byte 2) say which u16 fields follow them, kept as read.
+/// </summary>
+internal sealed record MaskPart(ItemContainer Equipped) : TailPart
+{
+    public uint Mask { get; set; }
+}
+
 /// <param name="EquippedMask">The Equipped header's u32 field mask, or null when it wasn't located.</param>
 internal sealed record InventoryScan(InventoryStatus Status, IReadOnlyList<ItemContainer> Containers, IReadOnlyList<TailPart> Parts,
     uint? EquippedMask);
@@ -123,8 +132,9 @@ internal static class InventoryScanner
         var ext = new ItemContainer(ContainerKind.Extra, extra);
         return new InventoryScan(InventoryStatus.Full, [eq, inv, ext],
         [
-            Opaque(d, statusAt, eqAt),
-            new RecordsPart(eq, equipped.Count, null, IndexedSlots: true),
+            Opaque(d, statusAt, eqAt - EquippedHeader),
+            new MaskPart(eq) { Mask = mask },
+            new RecordsPart(eq, null, null, IndexedSlots: true),
             Opaque(d, eqEnd, header + 1),
             new CountPart(inv),
             Opaque(d, header + 2, header + 3),
