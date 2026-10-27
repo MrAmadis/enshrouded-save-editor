@@ -72,6 +72,13 @@ internal sealed class KfcArchive : IDisposable
     public IReadOnlyList<ResourceId> ResourcesOfType(uint typeHash) =>
         _byType.TryGetValue(typeHash, out var list) ? list : [];
 
+    /// <summary>
+    /// <see cref="ResourcesOfType"/> in the order they are stored, so reading them all decompresses each chunk once (for
+    /// the 12,267 templates: 0.1 s instead of 6.6 s).
+    /// </summary>
+    public IReadOnlyList<ResourceId> ResourcesOfTypeInFileOrder(uint typeHash) =>
+        ResourcesOfType(typeHash).OrderBy(id => _resources[id].Offset).ToList();
+
     /// <summary>The first part of the resource with <paramref name="guid"/>, whatever its type; null when there is none.</summary>
     public ResourceId? Find(Guid guid) => _byGuid.TryGetValue(guid, out var id) ? id : null;
 

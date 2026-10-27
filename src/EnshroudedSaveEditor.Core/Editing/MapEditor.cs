@@ -1,4 +1,5 @@
 using EnshroudedSaveEditor.Core.Files;
+using EnshroudedSaveEditor.Core.Model;
 
 namespace EnshroudedSaveEditor.Core.Editing;
 
@@ -8,7 +9,10 @@ namespace EnshroudedSaveEditor.Core.Editing;
 /// </summary>
 public enum FogStatus { Fogged, Cleared, NoMap, Unrecognised }
 
-/// <summary>Clears the fog of war (docs/superpowers/specs/2026-10-26-map-fog-and-locations-design.md §7.2).</summary>
+/// <summary>
+/// Clears the fog of war and discovers the map's locations
+/// (docs/superpowers/specs/2026-10-26-map-fog-and-locations-design.md §7.2, §7.3).
+/// </summary>
 public sealed class MapEditor(SaveSession s)
 {
     public FogStatus Fog => s.Fog switch
@@ -19,6 +23,9 @@ public sealed class MapEditor(SaveSession s)
         null => FogStatus.Unrecognised,
     };
 
+    /// <summary>The character has a <c>player_knowledge</c> section to learn locations into; one that has never been in a world has none.</summary>
+    public bool HasKnowledge => s.File.Find("player_knowledge") is not null;
+
     /// <summary>Why the fog can't be cleared, for the statuses that don't have a map to clear.</summary>
     public static string Explain(FogStatus status) => status switch
     {
@@ -28,13 +35,34 @@ public sealed class MapEditor(SaveSession s)
         _ => "",
     };
 
+    void EnsureWritable()
+    {
+        if (s.ReadOnly) throw new EditRejectedException($"This save is read-only: {s.ReadOnlyReason}");
+    }
+
     /// <summary>Reveals the whole map: every cell of the grid is cleared, and its header is kept.</summary>
     public void ClearFog()
     {
-        if (s.ReadOnly) throw new EditRejectedException($"This save is read-only: {s.ReadOnlyReason}");
+        EnsureWritable();
         var status = Fog;
         if (status != FogStatus.Fogged) throw new EditRejectedException(Explain(status));
         s.Fog = s.Fog!.Cleared();
         s.MarkChanged();
+    }
+
+    /// <summary>How many of <paramref name="locations"/> the character has discovered (knows every id of), of how many.</summary>
+    public (int Discovered, int Total) Discovered(IReadOnlyList<MapLocation> locations) =>
+        (locations.Count(l => l.Knowledge.All(s.Knowledge.Contains)), locations.Count);
+
+    /// <summary>Learns every id of <paramref name="locations"/> the character doesn't know; returns how many locations that discovered.</summary>
+    public int DiscoverLocations(IReadOnlyList<MapLocation> locations)
+    {
+        EnsureWritable();
+        if (!HasKnowledge) throw new EditRejectedException(Explain(FogStatus.NoMap));
+        var (discovered, total) = Discovered(locations);
+        if (discovered == total) throw new EditRejectedException("Already discovered");
+        s.Knowledge = s.Knowledge.Learn(locations.SelectMany(l => l.Knowledge));
+        s.MarkChanged();
+        return total - discovered;
     }
 }

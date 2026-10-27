@@ -18,6 +18,19 @@ public sealed class PlayerKnowledge
 
     public bool Contains(uint id) => _ids.Contains(id);
 
+    /// <summary>
+    /// A copy with each of <paramref name="ids"/> it doesn't know appended after the existing entries, with value 1 (a
+    /// known Bool), as the game appends what a character learns. Known entries keep their values.
+    /// </summary>
+    public PlayerKnowledge Learn(IEnumerable<uint> ids)
+    {
+        var entries = Entries.ToList();
+        var known = new HashSet<uint>(_ids);
+        foreach (var id in ids)
+            if (known.Add(id)) entries.Add((id, 1));
+        return new PlayerKnowledge(Version, entries);
+    }
+
     public static PlayerKnowledge Parse(byte[] data)
     {
         if (data.Length < 8) throw new KsdFormatException("Unexpected player_knowledge layout.");

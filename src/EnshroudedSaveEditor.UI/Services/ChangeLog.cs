@@ -57,6 +57,8 @@ public sealed class ChangeLog
 
     public static string Level(uint from, int to) => $"Level {from} → {to}";
 
+    public static string Discovered(int locations) => locations == 1 ? "Discovered 1 location" : $"Discovered {locations} locations";
+
     public static string Xp(uint from, long to) => $"XP {from} → {to}";
 
     public static string Name(string from, string to) => $"Name {from} → {to}";

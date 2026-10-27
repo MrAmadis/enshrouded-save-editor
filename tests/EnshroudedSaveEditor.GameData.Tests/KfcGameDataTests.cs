@@ -158,6 +158,19 @@ public sealed class KfcGameDataTests(InstallDataFixture fixture) : IClassFixture
         }
     }
 
+    // Map spec §6.2: markers whose hint or visible state is one Bool of player knowledge, less every marker with an id
+    // that is also some marker's completed state.
+    [Fact]
+    public void Locations_are_the_markers_player_knowledge_shows()
+    {
+        var locations = fixture.Data.Locations;
+        Assert.Contains(locations, l => l.Name == "Fishing Island" && l.Knowledge.SequenceEqual([0xa545279fu]));
+        Assert.DoesNotContain(locations, l => l.Knowledge.Contains(0x667b66b6u));   // a Gem Forge's hint, a Night Temple's completed state
+        Assert.DoesNotContain(locations, l => l.Knowledge.Contains(0x01165547u));   // an Elixir Well's completed state (its skill points)
+        Assert.DoesNotContain(locations, l => l.Knowledge.Any(fixture.Data.Rewards.ContainsKey));
+        Assert.All(locations, l => Assert.NotEmpty(l.Knowledge));
+    }
+
     [Fact]
     public void Source_names_the_install()
     {
@@ -175,6 +188,7 @@ public sealed class KfcGameDataTests(InstallDataFixture fixture) : IClassFixture
         Assert.Equal(cold.Tree.Labels, cached.Tree.Labels);
         Assert.Equal(cold.Rewards.Values.OrderBy(r => r.Id), cached.Rewards.Values.OrderBy(r => r.Id));
         Assert.Equal(cold.LevelCap, cached.LevelCap);
+        Assert.Equal(cold.Locations.Select(Comparable), cached.Locations.Select(Comparable));
         Assert.Throws<NotSupportedException>(() => cached.XpPerLevel);
     }
 
@@ -189,6 +203,8 @@ public sealed class KfcGameDataTests(InstallDataFixture fixture) : IClassFixture
         Assert.Equal(cold.Items.All, rebuilt.Items.All);
         Assert.NotEqual("{ not a cache", File.ReadAllText(file));
     }
+
+    static string Comparable(MapLocation l) => $"{l.Name}|{string.Join(",", l.Knowledge)}";
 
     static string Comparable(SkillNode n) =>
         $"{n.Id}|{n.Name}|{n.Description}|{n.Type}|{n.Class}|{n.Cost}|{n.MaxRank}|{n.X}|{n.Y}|{string.Join(",", n.RankValues)}";

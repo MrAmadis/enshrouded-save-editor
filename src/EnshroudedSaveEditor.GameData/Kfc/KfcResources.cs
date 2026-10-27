@@ -20,10 +20,15 @@ internal sealed class KfcResources : IDisposable
     public KfcTypes Types { get; }
 
     /// <summary>Every resource of the type called <paramref name="typeName"/>.</summary>
-    public IEnumerable<KfcValue> All(string typeName)
+    public IEnumerable<KfcValue> All(string typeName) => Read(typeName, _archive.ResourcesOfType);
+
+    /// <summary><see cref="All"/> in the order they are stored: much faster for a type with thousands of resources.</summary>
+    public IEnumerable<KfcValue> AllInFileOrder(string typeName) => Read(typeName, _archive.ResourcesOfTypeInFileOrder);
+
+    IEnumerable<KfcValue> Read(string typeName, Func<uint, IReadOnlyList<ResourceId>> ids)
     {
         var type = Types[typeName];
-        foreach (var id in _archive.ResourcesOfType(type.Hash))
+        foreach (var id in ids(type.Hash))
             yield return new KfcValue(Types, type, _archive.ReadResource(id)!);
     }
 

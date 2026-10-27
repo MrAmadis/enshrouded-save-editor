@@ -18,6 +18,7 @@ public sealed class CompositeGameData : IGameData
     readonly Piece<IReadOnlyDictionary<uint, SkillReward>> _rewards;
     readonly Piece<int> _levelCap;
     readonly Piece<IReadOnlyList<uint>?> _xp;
+    readonly Piece<IReadOnlyList<MapLocation>> _locations;
 
     public CompositeGameData(IGameData primary, IGameData fallback)
     {
@@ -39,6 +40,7 @@ public sealed class CompositeGameData : IGameData
         _rewards = Take("rewards", g => g.Rewards);
         _levelCap = Take("level cap", g => g.LevelCap);
         _xp = Take("XP table", g => g.XpPerLevel);
+        _locations = Take("map locations", g => g.Locations);
 
         var pieces = new List<(string Name, IGameData? From)>
         {
@@ -47,6 +49,8 @@ public sealed class CompositeGameData : IGameData
         };
         // A null XP table means "unknown": it isn't named as coming from anywhere.
         if (_xp.From is null || _xp.Value is not null) pieces.Add((_xp.Name, _xp.From));
+        // Only the install has map locations: they are named when it gave them, and missing ones aren't.
+        if (_locations.From is not null) pieces.Add((_locations.Name, _locations.From));
         var groups = new[] { primary, fallback }
             .Select(g => (g.Source, Names: pieces.Where(p => p.From == g).Select(p => p.Name).ToList()))
             .Where(x => x.Names.Count > 0)
@@ -61,10 +65,11 @@ public sealed class CompositeGameData : IGameData
     public IReadOnlyDictionary<uint, SkillReward> Rewards => _rewards.Get();
     public int LevelCap => _levelCap.Get();
     public IReadOnlyList<uint>? XpPerLevel => _xp.Get();
+    public IReadOnlyList<MapLocation> Locations => _locations.Get();
 
     /// <summary>
     /// The source of every piece, or which pieces came from where ("Your Enshrouded install: items, …; Reference data (…):
-    /// rewards"). A null XP table (unknown) isn't named.
+    /// rewards"). A null XP table (unknown) and missing map locations aren't named.
     /// </summary>
     public string Source { get; }
 }

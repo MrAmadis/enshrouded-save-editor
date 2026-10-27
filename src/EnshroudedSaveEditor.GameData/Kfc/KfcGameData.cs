@@ -16,6 +16,7 @@ public sealed class KfcGameData : IGameData
     readonly SkillGraph? _tree;
     readonly IReadOnlyDictionary<uint, SkillReward>? _rewards;
     readonly int? _levelCap;
+    readonly IReadOnlyList<MapLocation>? _locations;
 
     KfcGameData(KfcSnapshot s)
     {
@@ -23,6 +24,7 @@ public sealed class KfcGameData : IGameData
         _tree = s.Tree?.ToGraph();
         _rewards = s.Rewards?.ToDictionary(r => r.Id);
         _levelCap = s.LevelCap;
+        _locations = s.Locations;
     }
 
     public IItemCatalog Items => _items ?? throw new NotSupportedException("items");
@@ -30,6 +32,7 @@ public sealed class KfcGameData : IGameData
     public IReadOnlyDictionary<uint, SkillReward> Rewards => _rewards ?? throw new NotSupportedException("rewards");
     public int LevelCap => _levelCap ?? throw new NotSupportedException("level cap");
     public IReadOnlyList<uint>? XpPerLevel => throw new NotSupportedException("XP table");
+    public IReadOnlyList<MapLocation> Locations => _locations ?? throw new NotSupportedException("map locations");
     public string Source => "Your Enshrouded install";
 
     /// <summary>
@@ -50,7 +53,8 @@ public sealed class KfcGameData : IGameData
         return new KfcGameData(snapshot);
     }
 
-    static bool Complete(KfcSnapshot s) => s is { Items: not null, Tree: not null, Rewards: not null, LevelCap: not null };
+    static bool Complete(KfcSnapshot s) =>
+        s is { Items: not null, Tree: not null, Rewards: not null, LevelCap: not null, Locations: not null };
 
     sealed record LevelCaps(int Player, int Item);
 
@@ -68,7 +72,8 @@ public sealed class KfcGameData : IGameData
         // Rewards: the knowledge ids that unlock skill points (Elixir Wells, Shroud Roots); the install has no names for them.
         var rewards = Piece(() => r.First("keen::GameKnowledgeResource")["skillPoints"].Elements
             .Select(p => new SkillReward(p["knowledgeId"]["id"].UInt, (int)p["amount"].Int, "", "")).ToList());
-        return new KfcSnapshot(items, tree, rewards, caps?.Player);
+        var locations = text is null ? null : Piece(() => KfcMapLocations.Read(r, text));
+        return new KfcSnapshot(items, tree, rewards, caps?.Player, locations);
     }
 
     /// <summary>One piece of the data, or null when the install's data for it isn't what this reader expects.</summary>

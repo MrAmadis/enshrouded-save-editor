@@ -61,16 +61,30 @@
         }
     </section>
 
-    <section class="panel">
-        <h3>Map</h3>
-        <div class="field-row fog-row">
+    <section class="panel map-panel">
+        <h3 class="map-title">Map <span class="tag tag-experimental">Experimental</span></h3>
+        <p class="map-warning">
+            Experimental, possibly dangerous: these options rewrite the character's map data, and not every effect in the
+            game has been tested. Places discovered here probably won't give their discovery XP later. Saving keeps a
+            backup first.
+        </p>
+        <div class="field-row map-row">
             <span class="field-label">Fog</span>
-            <span class="fog-status muted">@FogText(s.Fog)</span>
+            <span class="map-status fog-status muted">@FogText(s.Fog)</span>
             <button class="btn clear-fog" disabled="@(s.ReadOnly || s.Fog != FogStatus.Fogged)" @onclick="OnClearFog">Clear fog of war</button>
         </div>
         @if (_fogError is not null)
         {
             <div class="field-error">@_fogError</div>
+        }
+        <div class="field-row map-row">
+            <span class="field-label">Places</span>
+            <span class="map-status places-status muted">@(s.Locations.Unavailable ?? $"{s.Locations.Discovered} of {s.Locations.Total} discovered")</span>
+            <button class="btn discover" disabled="@(s.ReadOnly || s.Locations.Unavailable is not null || s.Locations.Discovered == s.Locations.Total)" @onclick="OnDiscover">Discover all locations</button>
+        </div>
+        @if (_placesError is not null)
+        {
+            <div class="field-error">@_placesError</div>
         }
     </section>
 </div>
@@ -80,6 +94,7 @@
     private string? _levelError;
     private string? _xpError;
     private string? _fogError;
+    private string? _placesError;
 
     private ElementReference _tab;
     private IJSObjectReference? _fit;
@@ -145,6 +160,8 @@
     }
 
     private void OnClearFog() => _fogError = Try(() => EditorService.ClearFog());
+
+    private void OnDiscover() => _placesError = Try(() => EditorService.DiscoverLocations());
 
     private static string FogText(FogStatus fog) => fog switch
     {

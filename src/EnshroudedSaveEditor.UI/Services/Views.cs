@@ -54,6 +54,7 @@ public sealed record SkillNodeView(
 /// <param name="Overflow">Records outside the grid the UI shows: Extra slots past the equipped backpack's extension, and
 /// Inventory slots past 39. They are kept as they are; the UI lists them so they can be moved or removed.</param>
 /// <param name="Fog">The map's fog of war (<see cref="MapEditor.Fog"/>).</param>
+/// <param name="Locations">How many of the map's locations the character has discovered.</param>
 public sealed record SessionView(
     string Path,
     string FileName,
@@ -75,7 +76,12 @@ public sealed record SessionView(
     bool CanUndo,
     uint? XpToNextLevel,
     IReadOnlyList<SlotView> Overflow,
-    FogStatus Fog);
+    FogStatus Fog,
+    LocationsView Locations);
+
+/// <summary>The map's locations the character has discovered (<see cref="MapEditor.Discovered"/>), of how many.</summary>
+/// <param name="Unavailable">Why they can't be discovered (no install data, or no map yet); null when they can.</param>
+public sealed record LocationsView(int Discovered, int Total, string? Unavailable);
 
 /// <summary>An item the Add item browser offers.</summary>
 /// <param name="SubCategory">The weapon type for Weapons ("RangedBow"; "" when it has none), the <see cref="EquipSlot"/>

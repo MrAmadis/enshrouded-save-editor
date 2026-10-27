@@ -39,7 +39,7 @@ public sealed class SaveSession
     public KsdFile File { get; }
     public CharacterData Character { get; set; }
     public PlayerCharacter Player { get; private set; }
-    public PlayerKnowledge Knowledge { get; private set; }
+    public PlayerKnowledge Knowledge { get; set; }
 
     /// <summary>Null when the character has no <c>fogofwar</c> section or its layout isn't recognised; it is then left untouched.</summary>
     public FogOfWar? Fog { get; set; }

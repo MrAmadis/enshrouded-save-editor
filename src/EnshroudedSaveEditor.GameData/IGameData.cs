@@ -12,5 +12,8 @@ public interface IGameData
     /// <summary><c>XpPerLevel[i]</c> is the XP needed to go from level i+1 to i+2; null when unknown.</summary>
     IReadOnlyList<uint>? XpPerLevel { get; }
 
+    /// <summary>The places the map marks and the knowledge that shows them; only the install has them.</summary>
+    IReadOnlyList<MapLocation> Locations => throw new NotSupportedException("map locations");
+
     string Source { get; }
 }

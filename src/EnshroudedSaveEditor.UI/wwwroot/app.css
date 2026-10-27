@@ -269,8 +269,20 @@ h3 { font-size: 12px; letter-spacing: .18em; color: var(--gold); text-transform:
 .points dd { text-align: right; font-weight: 600; color: var(--gold-2); }
 .points dd.negative { color: #e5586f; }
 .points .banner { margin-top: 12px; }
-.fog-row { margin-bottom: 0; }
-.fog-status { flex: 1; }
+.map-title { display: flex; align-items: center; gap: 10px; }
+.map-title .tag { margin-left: 0; font-family: "Source Sans 3", "Segoe UI", sans-serif; }
+.tag-experimental { border-color: rgba(233, 138, 60, .6); color: #f3c597; }
+.map-warning {
+    margin: 0 0 14px;
+    padding: 8px 12px;
+    border: 1px solid rgba(233, 138, 60, .6);
+    border-radius: 3px;
+    background: rgba(233, 138, 60, .12);
+    color: #f3c597;
+    font-size: 13px;
+}
+.map-row:last-child { margin-bottom: 0; }
+.map-status { flex: 1; }
 
 /* Rarity colours (text) */
 .c-common, .chip.c-common { color: var(--common); }

@@ -276,6 +276,34 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         return ChangeLog.ClearedFog;
     });
 
+    /// <summary>Discovers every location on the map (<see cref="MapEditor.DiscoverLocations"/>); needs the install's data.</summary>
+    public SessionView DiscoverLocations() => Edit(s =>
+        ChangeLog.Discovered(new MapEditor(s).DiscoverLocations(MapLocations() ?? throw new EditRejectedException(NoLocationData))));
+
+    private const string NoLocationData = "The map's locations come from your Enshrouded install, and its data couldn't be read.";
+
+    /// <summary>The map's locations, or null when the game data has none (only the install does).</summary>
+    private IReadOnlyList<MapLocation>? MapLocations()
+    {
+        try
+        {
+            return Data.Locations;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private LocationsView Locations(SaveSession s)
+    {
+        var map = new MapEditor(s);
+        if (MapLocations() is not { } all) return new LocationsView(0, 0, NoLocationData);
+        if (!map.HasKnowledge) return new LocationsView(0, all.Count, MapEditor.Explain(FogStatus.NoMap));
+        var (discovered, total) = map.Discovered(all);
+        return new LocationsView(discovered, total, null);
+    }
+
     // Inventory (see InventoryEditor for the rules)
 
     public SessionView SetCount(ItemRef r, int count) => Edit(s =>
@@ -580,7 +608,7 @@ public sealed class EditorService(EditorOptions options, GameDataProvider game, 
         return new SessionView(
             s.Path, Path.GetFileName(s.Path), s.Character.Name, level, s.Player.Xp, data.LevelCap, s.ReadOnly, s.ReadOnlyReason,
             s.Player.InventoryStatus, equipped, backpack, hotbar, skills.Points(), nodes, data.Tree.Links, data.Tree.Labels,
-            _log.Lines, _undo.Count > 0, XpToNextLevel(data, level), overflow, new MapEditor(s).Fog);
+            _log.Lines, _undo.Count > 0, XpToNextLevel(data, level), overflow, new MapEditor(s).Fog, Locations(s));
     }
 
     /// <summary>The attributes, by the word the game's text uses, with the tag the skill tree shows.</summary>

@@ -81,5 +81,31 @@ public class CompositeGameDataTests
     {
         var g = new CompositeGameData(new Partial("A"), new Partial("B"));
         Assert.Throws<NotSupportedException>(() => g.Items);
+        Assert.Throws<NotSupportedException>(() => g.Locations);
+    }
+
+    /// <summary>Every piece of <paramref name="data"/>, plus map locations.</summary>
+    sealed class WithLocations(string source, IGameData data, IReadOnlyList<MapLocation> locations) : IGameData
+    {
+        public IItemCatalog Items => data.Items;
+        public SkillGraph Tree => data.Tree;
+        public IReadOnlyDictionary<uint, SkillReward> Rewards => data.Rewards;
+        public int LevelCap => data.LevelCap;
+        public IReadOnlyList<uint>? XpPerLevel => data.XpPerLevel;
+        public IReadOnlyList<MapLocation> Locations => locations;
+        public string Source => source;
+    }
+
+    // The reference data has no map locations; only the install does.
+    [Fact]
+    public void Locations_come_from_whichever_source_has_them()
+    {
+        var reference = ReferenceGameData.Load();
+        IReadOnlyList<MapLocation> places = [new("Fishing Island", [0xa545279f])];
+
+        var g = new CompositeGameData(new Named("Reference", reference), new WithLocations("Install", reference, places));
+
+        Assert.Same(places, g.Locations);
+        Assert.Equal("Reference: items, skill tree, rewards, level cap; Install: map locations", g.Source);
     }
 }

@@ -33,6 +33,26 @@ public sealed class EditorServiceTests : IDisposable
         public string Source => "test";
     }
 
+    /// <summary>The reference data with map locations, as the install gives them.</summary>
+    public sealed class WithLocations(IGameData inner) : IGameData
+    {
+        public IItemCatalog Items => inner.Items;
+        public SkillGraph Tree => inner.Tree;
+        public IReadOnlyDictionary<uint, SkillReward> Rewards => inner.Rewards;
+        public int LevelCap => inner.LevelCap;
+        public IReadOnlyList<uint>? XpPerLevel => inner.XpPerLevel;
+        public IReadOnlyList<MapLocation> Locations => Places;
+        public string Source => "test";
+    }
+
+    /// <summary>Three places: character2 knows the first one's id and one of the second's.</summary>
+    public static readonly IReadOnlyList<MapLocation> Places =
+    [
+        new("Known", [0x01165547]),
+        new("Half known", [0x0E7B9462, 0xA1A1A1A1]),
+        new("New", [0xA2A2A2A2, 0xA3A3A3A3]),
+    ];
+
     const uint CopperOre = 0x2b9d5b6f;          // max 250
     const uint WolfsSnarlLongbow = 0x29433573;  // Weapons/RangedBow
     const uint AdventurerHelmet = 0xff1b25e5;   // Equipment/Helmet
@@ -185,6 +205,47 @@ public sealed class EditorServiceTests : IDisposable
         Assert.Equal(SaveResult.Saved, e.Save());
 
         Assert.Equal(FogStatus.Cleared, Start().Open(C(2)).Fog);
+    }
+
+    [Fact]
+    public void DiscoverLocations_is_an_edit_that_undo_reverts()
+    {
+        var e = Start(() => new WithLocations(ReferenceGameData.Load()));
+        Assert.Equal(new LocationsView(1, 3, null), e.Open(C(2)).Locations);
+
+        var found = e.DiscoverLocations();
+        Assert.Equal(new LocationsView(3, 3, null), found.Locations);
+        Assert.Equal(["Discovered 2 locations"], found.Pending);
+        Assert.Equal("Already discovered", Rejected(() => e.DiscoverLocations()).Message);
+
+        var undone = e.Undo();
+        Assert.Equal(new LocationsView(1, 3, null), undone.Locations);
+        Assert.Empty(undone.Pending);
+    }
+
+    [Fact]
+    public void Discovered_locations_are_saved()
+    {
+        var e = Start(() => new WithLocations(ReferenceGameData.Load()));
+        e.Open(C(2));
+        e.DiscoverLocations();
+
+        Assert.Equal(SaveResult.Saved, e.Save());
+
+        Assert.Equal(new LocationsView(3, 3, null), Start(() => new WithLocations(ReferenceGameData.Load())).Open(C(2)).Locations);
+    }
+
+    // Only the install has the map's locations; the reference data has none.
+    [Fact]
+    public void Without_the_install_data_locations_cannot_be_discovered()
+    {
+        var e = Start();
+        var reason = e.Open(C(2)).Locations.Unavailable;
+        Assert.NotNull(reason);
+        Assert.Contains("install", reason);
+
+        Assert.Equal(reason, Rejected(() => e.DiscoverLocations()).Message);
+        Assert.Empty(e.Current.Pending);
     }
 
     [Fact]

@@ -15,7 +15,9 @@ internal sealed record KfcTreeSnapshot(IReadOnlyList<SkillNode> Nodes, IReadOnly
 }
 
 /// <summary>What <see cref="KfcGameData"/> read from the install. A null piece couldn't be read.</summary>
-internal sealed record KfcSnapshot(IReadOnlyList<ItemInfo>? Items, KfcTreeSnapshot? Tree, IReadOnlyList<SkillReward>? Rewards, int? LevelCap);
+internal sealed record KfcSnapshot(
+    IReadOnlyList<ItemInfo>? Items, KfcTreeSnapshot? Tree, IReadOnlyList<SkillReward>? Rewards, int? LevelCap,
+    IReadOnlyList<MapLocation>? Locations);
 
 /// <summary>
 /// The extracted game data as JSON in the cache folder, keyed to the size and timestamp of <c>enshrouded.kfc</c> and
@@ -24,7 +26,7 @@ internal sealed record KfcSnapshot(IReadOnlyList<ItemInfo>? Items, KfcTreeSnapsh
 internal static class KfcCache
 {
     /// <summary>Raised whenever what is extracted, or how it is stored, changes.</summary>
-    const int Format = 1;
+    const int Format = 2;
 
     static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 

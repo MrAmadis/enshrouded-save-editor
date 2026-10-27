@@ -23,7 +23,8 @@ public sealed class KfcCacheTests : IDisposable
             [[1, 2]],
             [new ArchetypeLabel("WIZARD", SkillClass.Mage, 6643, 4709)]),
         [new SkillReward(18240839, 3, "", "")],
-        50);
+        50,
+        [new MapLocation("Fishing Island", [0xa545279f])]);
 
     [Fact]
     public void A_snapshot_round_trips_under_its_key()
@@ -38,14 +39,17 @@ public sealed class KfcCacheTests : IDisposable
         Assert.Equal((1u, 2u), tree.Links.Single());
         Assert.Equal(Sample.Tree!.Labels, tree.Labels);
         Assert.Equal(1.5, tree.Find(1)!.X);
+        var location = Assert.Single(back.Locations!);
+        Assert.Equal("Fishing Island", location.Name);
+        Assert.Equal([0xa545279fu], location.Knowledge);
     }
 
     [Fact]
     public void Pieces_that_could_not_be_read_stay_missing()
     {
-        KfcCache.Write(CachePath, "key-1", new KfcSnapshot(null, null, null, null));
+        KfcCache.Write(CachePath, "key-1", new KfcSnapshot(null, null, null, null, null));
         var back = KfcCache.Read(CachePath, "key-1")!;
-        Assert.Equal((null, null, null, null), (back.Items, back.Tree, back.Rewards, back.LevelCap));
+        Assert.Equal((null, null, null, null, null), (back.Items, back.Tree, back.Rewards, back.LevelCap, back.Locations));
     }
 
     [Fact]
