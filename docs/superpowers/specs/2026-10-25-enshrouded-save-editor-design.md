@@ -38,7 +38,7 @@ A save editor for **Enshrouded 1.0** that lets the owner change their character'
 
 *(my calls; the owner didn't ask for these)*
 - World saves (`worldN.ksd`): chests, bases, NPCs, the world itself.
-- Fog of war (`fogofwar`), unlocking Elixir Wells and Shroud Roots, recipes and other `player_knowledge` edits. These are read only, for the points budget.
+- Fog of war (`fogofwar`), unlocking Elixir Wells and Shroud Roots, recipes and other `player_knowledge` edits. These are read only, for the points budget. *(Since 2026-10-27, clearing the fog of war is in: see `2026-10-26-map-fog-and-locations-design.md`.)*
 - Appearance and customization items (hair and similar). They are kept untouched and are not shown as inventory.
 - `global.ksd`: known players, adventure subscriptions, user data.
 - Status effects (buffs) and the `voiceover` section.

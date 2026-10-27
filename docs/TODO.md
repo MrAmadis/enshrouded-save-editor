@@ -7,9 +7,12 @@
   - how the game sets equipped header byte 2;
   - then enabling equip into an empty slot, and unequip.
 - **Steam characters:** check that an edited Steam character survives Steam Cloud (owner to decide how). Then decide whether saving needs Steam closed (spec §10.2).
+- **Clear fog of war:** works in-game (owner, 2026-10-27). Not reported yet: whether Midhollow, Fox Chase and the Ancient Spires show without being visited (map spec `2026-10-26-map-fog-and-locations-design.md` §8, check 2).
+- **Discover all locations:** on hold (owner, 2026-10-27). The findings are in the map spec §6.
 - **Later: editing upgrades** (the rarity field's second byte), once their rules are known: the maximum, and how rarity changes. See "Upgrades on ranged items" in `docs/research/in-game-findings.md`.
 
 ## 2. Cleanup
 
+- **The test character "Fog Test"** (`keen games\Enshrouded\default\character2.ksd`, a Lab copy of Steam character2): delete it in-game when testing is done.
 - **The test character "Leftover Checks"** (`keen games\Enshrouded\default\character1.ksd`): delete it in-game when testing is done. Every earlier test character, and the six unused copies in the Steam folder, were removed on 2026-10-26 (to the Recycle Bin).
 - **In-game checks:** always use a new throwaway world. Test characters were played in Steam `world0` (session A, and "Final Check"), and the game saved that world.

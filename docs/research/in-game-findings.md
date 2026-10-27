@@ -139,6 +139,16 @@ What this settles:
 - **The editor holding install files open** doesn't stop the game from starting.
 - The Shroud Meteor Scroll's fixed level doesn't matter in a save: it is a stack, and stacks carry no level field.
 
+## Clear fog of war — 2026-10-27
+
+"Fog Test", a Lab copy of Steam character2 (level 8, about 2.5 % of the fog grid cleared), in the local folder as
+`character2.ksd`. The owner cleared its fog in the editor (Character → Map → Clear fog of war), saved, and loaded it in the
+game.
+
+- **The game accepts a fully cleared grid** (owner: "Works"). Clearing the fog is settled (map spec §8, check 1).
+- Not reported: whether markers with no unlock rule (Midhollow, Fox Chase, the Ancient Spires) show without a visit
+  (map spec §8, check 2). It only matters for the on-hold Discover all locations.
+
 ## Still open
 
 - ~~The in-game name box limit~~: 15 characters (owner, above).
