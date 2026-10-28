@@ -6,6 +6,8 @@
   <a href="https://github.com/MrAmadis/enshrouded-save-editor/releases/latest"><b>Download the latest release</b></a>
   &nbsp;·&nbsp;
   <a href="https://www.nexusmods.com/enshrouded/mods/244">Nexus Mods page</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/MrAmadis/enshrouded-save-editor/issues">Report a bug</a>
 </p>
 
 A save editor for Enshrouded 1.0 characters, styled like the game. Pick a character, change it, and save back. The editor finds your Steam and local characters on its own and backs up the save before every change, so you can always go back.
